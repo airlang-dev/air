@@ -1,0 +1,93 @@
+@air 0.1
+
+workflow Aurora_Fact_Check -> Artifact | Fault
+
+fault_handler {
+  return Fault(reason="Unhandled failure")
+}
+
+summary = llm(summarize_aurora)
+
+claims = transform(summary, Claim[])
+         via llm(extract_claims)
+
+route(claims) {
+  Fault   -> regenerate
+  Claim[] -> verification
+}
+
+verification:
+parallel {
+  v1, _ = verify(claims, product_existence)
+  v2, _ = verify(claims, link_validation)
+  v3, _ = verify(claims, compute_claim)
+}
+
+consensus = aggregate([v1, v2, v3], majority)
+
+outcome = gate(consensus)
+
+route(outcome) {
+  PROCEED  -> publish
+  ESCALATE -> review
+  RETRY    -> regenerate
+  HALT     -> abort
+}
+
+regenerate:
+loop retry_generation [max=2] {
+  summary2 = llm(regenerate_summary)
+
+  claims2 = transform(summary2, Claim[])
+            via llm(extract_claims)
+
+  route(claims2) {
+    Claim[] -> verification_retry
+    Fault   -> continue
+  }
+}
+
+verification_retry:
+parallel {
+  v4, _ = verify(claims2, product_existence)
+  v5, _ = verify(claims2, link_validation)
+  v6, _ = verify(claims2, compute_claim)
+}
+
+consensus2 = aggregate([v4, v5, v6], majority)
+
+outcome2 = gate(consensus2)
+
+route(outcome2) {
+  PROCEED  -> publish_retry
+  ESCALATE -> review
+  RETRY    -> review
+  HALT     -> abort
+}
+
+publish:
+return Artifact(
+  status="verified",
+  summary=summary,
+  verification=consensus
+)
+
+publish_retry:
+return Artifact(
+  status="verified_after_retry",
+  summary=summary2,
+  verification=consensus2
+)
+
+review:
+msg, outcome3 = decide(human_reviewer, summary)
+
+route(outcome3) {
+  PROCEED  -> publish
+  HALT     -> abort
+  ESCALATE -> abort
+  RETRY    -> regenerate
+}
+
+abort:
+return Fault(reason="Verification failed")

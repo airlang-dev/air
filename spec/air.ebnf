@@ -1,0 +1,265 @@
+(* ========================================= *)
+(* AIR Language Grammar                      *)
+(* Version: 0.1.0                            *)
+(* ========================================= *)
+
+air_program
+    = version_decl , { workflow_decl } ;
+
+version_decl
+    = "@air" , version ;
+
+version
+    = number , "." , number ;
+
+
+(* ========================================= *)
+(* WORKFLOWS                                 *)
+(* ========================================= *)
+
+workflow_decl
+    = "workflow" , identifier ,
+      "->" , return_type ,
+      { workflow_element } ;
+
+return_type
+    = type_name , { "|" , type_name } ;
+
+
+workflow_element
+    = statement
+    | block_label
+    | fault_handler ;
+
+
+block_label
+    = identifier , ":" ;
+
+
+fault_handler
+    = "fault_handler" ,
+      "{" ,
+        { statement } ,
+      "}" ;
+
+
+(* ========================================= *)
+(* STATEMENTS                                *)
+(* ========================================= *)
+
+statement
+    = assignment
+    | route_stmt
+    | parallel_block
+    | loop_block
+    | return_stmt
+    | unreachable_stmt
+    | continue_stmt ;
+
+
+assignment
+    = lvalue , "=" , expression ;
+
+
+lvalue
+    = identifier
+    | identifier , "," , identifier
+    | "_" , "," , identifier
+    | identifier , "," , "_" ;
+
+
+(* ========================================= *)
+(* EXPRESSIONS                               *)
+(* ========================================= *)
+
+expression
+    = llm_call
+    | tool_call
+    | transform_expr
+    | verify_call
+    | aggregate_call
+    | gate_call
+    | decide_call
+    | constructor ;
+
+
+(* ========================================= *)
+(* INSTRUCTIONS                              *)
+(* ========================================= *)
+
+llm_call
+    = "llm" , "(" , identifier , ")" ;
+
+
+tool_call
+    = "tool" , "(" , identifier , [ argument_list ] , ")" ;
+
+
+transform_expr
+    = "transform" , "(" , identifier , "," , type_name , ")" ,
+      [ transform_via ] ;
+
+
+transform_via
+    = "via" , llm_call ;
+
+
+verify_call
+    = "verify" , "(" , identifier , "," , identifier , ")" ;
+
+
+aggregate_call
+    = "aggregate" ,
+      "(" ,
+        list_literal ,
+        "," ,
+        identifier ,
+      ")" ;
+
+
+gate_call
+    = "gate" , "(" , identifier , ")" ;
+
+
+decide_call
+    = "decide" ,
+      "(" ,
+        identifier ,
+        [ "," , argument_list ] ,
+      ")" ;
+
+
+(* ========================================= *)
+(* CONTROL FLOW                              *)
+(* ========================================= *)
+
+route_stmt
+    = "route" ,
+      "(" ,
+        identifier ,
+      ")" ,
+      "{" ,
+        { route_case } ,
+      "}" ;
+
+
+route_case
+    = pattern , "->" , route_target ;
+
+
+pattern
+    = identifier
+    | type_name
+    | "default" ;
+
+
+route_target
+    = identifier
+    | "continue"
+    | return_stmt ;
+
+
+parallel_block
+    = "parallel" ,
+      "{" ,
+        { statement } ,
+      "}" ;
+
+
+loop_block
+    = "loop" ,
+      identifier ,
+      "[" ,
+        "max" , "=" , number ,
+      "]" ,
+      "{" ,
+        { statement } ,
+      "}" ;
+
+
+continue_stmt
+    = "continue" ;
+
+
+return_stmt
+    = "return" , constructor ;
+
+
+unreachable_stmt
+    = "unreachable" ;
+
+
+(* ========================================= *)
+(* DATA STRUCTURES                           *)
+(* ========================================= *)
+
+list_literal
+    = "[" ,
+        identifier ,
+        { "," , identifier } ,
+      "]" ;
+
+
+constructor
+    = type_name ,
+      "(" ,
+        [ field_list ] ,
+      ")" ;
+
+
+field_list
+    = field , { "," , field } ;
+
+
+field
+    = identifier , "=" , value ;
+
+
+argument_list
+    = argument , { "," , argument } ;
+
+
+argument
+    = identifier | value ;
+
+
+value
+    = identifier
+    | string
+    | number ;
+
+
+(* ========================================= *)
+(* TYPES                                     *)
+(* ========================================= *)
+
+type_name
+    = identifier , [ "[]" ] ;
+
+
+(* ========================================= *)
+(* LEXICAL                                   *)
+(* ========================================= *)
+
+identifier
+    = letter , { letter | digit | "_" } ;
+
+
+number
+    = digit , { digit } ;
+
+
+string
+    = '"' , { character } , '"' ;
+
+
+letter
+    = "A"..."Z" | "a"..."z" ;
+
+
+digit
+    = "0"..."9" ;
+
+
+character
+    = ? any character except " ? ;

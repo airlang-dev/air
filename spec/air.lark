@@ -1,0 +1,199 @@
+// =============================
+// AIR Grammar v0.1
+// =============================
+
+start: air_program
+
+// -----------------------------
+// PROGRAM
+// -----------------------------
+
+air_program: version_decl workflow_decl+
+
+version_decl: "@air" VERSION
+
+workflow_decl: "workflow" IDENTIFIER "->" return_type workflow_body
+
+workflow_body: statement+
+
+return_type: type_name ("|" type_name)*
+
+
+// -----------------------------
+// STATEMENTS
+// -----------------------------
+
+statement: fault_handler
+         | assignment
+         | route_stmt
+         | block_label
+         | parallel_block
+         | loop_block
+         | return_stmt
+         | continue_stmt
+         | unreachable_stmt
+
+
+// -----------------------------
+// LABELS
+// -----------------------------
+
+block_label: IDENTIFIER ":"
+
+
+// -----------------------------
+// FAULT HANDLER
+// -----------------------------
+
+fault_handler: "fault_handler" "{" statement* "}"
+
+
+// -----------------------------
+// ASSIGNMENT
+// -----------------------------
+
+assignment: lvalue "=" expression
+
+lvalue: IDENTIFIER ("," IDENTIFIER)*
+
+
+// -----------------------------
+// EXPRESSIONS
+// -----------------------------
+
+expression: llm_call
+          | verify_call
+          | aggregate_call
+          | gate_call
+          | decide_call
+          | transform_expr
+          | constructor
+
+
+// -----------------------------
+// LLM
+// -----------------------------
+
+llm_call: "llm" "(" IDENTIFIER ")"
+
+
+// -----------------------------
+// VERIFY
+// -----------------------------
+
+verify_call: "verify" "(" IDENTIFIER "," IDENTIFIER ")"
+
+
+// -----------------------------
+// AGGREGATE
+// -----------------------------
+
+aggregate_call: "aggregate" "(" list_literal "," IDENTIFIER ")"
+
+list_literal: "[" IDENTIFIER ("," IDENTIFIER)* "]"
+
+
+// -----------------------------
+// GATE
+// -----------------------------
+
+gate_call: "gate" "(" IDENTIFIER ")"
+
+
+// -----------------------------
+// DECIDE
+// -----------------------------
+
+decide_call: "decide" "(" IDENTIFIER ("," IDENTIFIER)? ")"
+
+
+// -----------------------------
+// TRANSFORM
+// -----------------------------
+
+transform_expr: "transform" "(" IDENTIFIER "," type_name ")" "via" llm_call
+
+
+// -----------------------------
+// ROUTE
+// -----------------------------
+
+route_stmt: "route" "(" IDENTIFIER ")" "{" route_case+ "}"
+
+route_case: pattern "->" route_target
+
+route_target: IDENTIFIER
+
+pattern: IDENTIFIER
+       | type_name
+       | "default"
+
+
+// -----------------------------
+// PARALLEL
+// -----------------------------
+
+parallel_block: "parallel" "{" statement+ "}"
+
+
+// -----------------------------
+// LOOP
+// -----------------------------
+
+loop_block: "loop" IDENTIFIER "[" "max" "=" NUMBER "]" "{" statement+ "}"
+
+
+// -----------------------------
+// RETURN
+// -----------------------------
+
+return_stmt: "return" constructor
+
+constructor: type_name "(" field_list? ")"
+
+field_list: field ("," field)*
+
+field: IDENTIFIER "=" value
+
+value: IDENTIFIER
+     | STRING
+
+
+// -----------------------------
+// CONTROL
+// -----------------------------
+
+continue_stmt: "continue"
+
+unreachable_stmt: "unreachable"
+
+
+// -----------------------------
+// TYPES
+// -----------------------------
+
+type_name: IDENTIFIER array_suffix?
+
+array_suffix: "[" "]"
+
+
+// -----------------------------
+// TOKENS
+// -----------------------------
+
+IDENTIFIER: /[A-Za-z_][A-Za-z0-9_]*/
+
+VERSION: /[0-9]+\.[0-9]+/
+
+NUMBER: /[0-9]+/
+
+STRING: /"[^"]*"/
+
+
+// -----------------------------
+// IGNORED
+// -----------------------------
+
+%import common.WS
+%ignore WS
+%ignore /\/\/[^\n]*/
