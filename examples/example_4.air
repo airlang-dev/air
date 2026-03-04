@@ -1,0 +1,18 @@
+@air 0.1
+
+workflow Unreachable_Block_Test -> Artifact | Fault
+
+summary = llm(summarize)
+
+route(summary) {
+  PROCEED  -> done
+  ESCALATE -> done
+  RETRY    -> done
+  HALT     -> done
+}
+
+done:
+return Artifact(status="ok")
+
+unused:
+return Fault(reason="never executed")

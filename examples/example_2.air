@@ -1,0 +1,32 @@
+@air 0.1
+
+workflow Loop_Backedge_Test -> Artifact | Fault
+
+summary = llm(summarize)
+
+claims = transform(summary, Claim[]) via llm(extract_claims)
+
+route(claims) {
+  Fault   -> retry
+  Claim[] -> done
+}
+
+retry:
+loop retry_generation [max=3] {
+
+  summary2 = llm(regenerate)
+
+  claims2 = transform(summary2, Claim[]) via llm(extract_claims)
+
+  route(claims2) {
+    Fault   -> continue
+    Claim[] -> done
+  }
+
+}
+
+done:
+return Artifact(
+  status="ok",
+  summary=summary
+)

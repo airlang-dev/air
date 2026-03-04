@@ -1,0 +1,32 @@
+@air 0.1
+
+workflow Dead_End_Test -> Artifact | Fault
+
+summary = llm(summarize)
+
+route(summary) {
+  PROCEED  -> loop_start
+  ESCALATE -> loop_start
+  RETRY    -> loop_start
+  HALT     -> loop_start
+}
+
+loop_start:
+attempt = llm(regenerate)
+
+route(attempt) {
+  PROCEED  -> loop_continue
+  ESCALATE -> loop_continue
+  RETRY    -> loop_continue
+  HALT     -> loop_continue
+}
+
+loop_continue:
+check = llm(check_again)
+
+route(check) {
+  PROCEED  -> loop_start
+  ESCALATE -> loop_start
+  RETRY    -> loop_start
+  HALT     -> loop_start
+}

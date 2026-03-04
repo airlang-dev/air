@@ -8,7 +8,7 @@ with open("spec/air.lark") as f:
 
 parser = Lark(grammar, start="start")
 
-with open("examples/aurora.air") as f:
+with open("examples/example_6.air") as f:
     source = f.read()
 
 try:
@@ -24,6 +24,13 @@ try:
     builder = ASTBuilder()
     program = builder.build(tree)
     pprint.pp(program, width=120, compact=True)
+
+    from cfg_builder import build_cfg
+
+    for wf in program.workflows:
+        cfg = build_cfg(wf)
+        print(f"\n[✓] CFG built for workflow '{wf.name}'\n")
+        print(cfg)
 
 except UnexpectedInput as e:
     print("[✗] Parse error\n")

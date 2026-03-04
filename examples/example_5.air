@@ -1,0 +1,15 @@
+@air 0.1
+
+workflow Unknown_Target_Test -> Artifact | Fault
+
+summary = llm(summarize)
+
+route(summary) {
+  PROCEED  -> done
+  ESCALATE -> missing_label
+  RETRY    -> done
+  HALT     -> done
+}
+
+done:
+return Artifact(status="ok")
