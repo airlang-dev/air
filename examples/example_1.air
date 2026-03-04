@@ -91,6 +91,3 @@ route(outcome3) {
 
 abort:
 return Fault(reason="Verification failed")
-
-unused_block:
-return Fault(reason="should never run")

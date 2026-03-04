@@ -1,0 +1,23 @@
+@air 0.1
+
+workflow Terminal_Node_EGIR_Test -> Artifact | Fault
+
+summary = llm(summarize)
+
+route(summary) {
+  PROCEED  -> publish
+  ESCALATE -> abort
+  RETRY    -> publish
+  HALT     -> abort
+}
+
+publish:
+return Artifact(
+  status="ok",
+  summary=summary
+)
+
+abort:
+return Fault(
+  reason="failed"
+)

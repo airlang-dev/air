@@ -8,7 +8,7 @@ with open("spec/air.lark") as f:
 
 parser = Lark(grammar, start="start")
 
-with open("examples/example_6.air") as f:
+with open("examples/example_7.air") as f:
     source = f.read()
 
 try:
@@ -31,6 +31,12 @@ try:
         cfg = build_cfg(wf)
         print(f"\n[✓] CFG built for workflow '{wf.name}'\n")
         print(cfg)
+
+        from egir_builder import build_egir
+
+        egir = build_egir(cfg)
+        print(f"[✓] EGIR built for workflow '{wf.name}'\n")
+        print(egir)
 
 except UnexpectedInput as e:
     print("[✗] Parse error\n")

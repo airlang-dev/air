@@ -1,0 +1,33 @@
+@air 0.1
+
+workflow Undefined_Variable_Test -> Artifact | Fault
+
+summary = llm(summarize)
+
+route(summary) {
+  PROCEED  -> verify_claims
+  ESCALATE -> abort
+  RETRY    -> verify_claims
+  HALT     -> abort
+}
+
+verify_claims:
+v = verify(claims, product_existence)
+
+route(v) {
+  PROCEED  -> publish
+  ESCALATE -> abort
+  RETRY    -> abort
+  HALT     -> abort
+}
+
+publish:
+return Artifact(
+  status="ok",
+  summary=summary
+)
+
+abort:
+return Fault(
+  reason="verification failed"
+)
