@@ -31,7 +31,9 @@ def _collect_edges(instructions: list, node_label: str) -> list[CFGEdge]:
                     edges.append(CFGEdge(target=node_label, condition="continue"))
                 else:
                     edges.append(
-                        CFGEdge(target=case.target, condition=_pattern_str(case.pattern))
+                        CFGEdge(
+                            target=case.target, condition=_pattern_str(case.pattern)
+                        )
                     )
         elif isinstance(inst, Loop):
             edges.extend(_collect_edges(inst.body, node_label))
@@ -78,25 +80,19 @@ def build_cfg(workflow: Workflow) -> CFG:
     for label, node in cfg.nodes.items():
         for edge in node.edges:
             if edge.target not in cfg.nodes:
-                raise ValueError(
-                    f"CFG error: unknown target '{edge.target}'"
-                )
+                raise ValueError(f"CFG error: unknown target '{edge.target}'")
 
     # Validate: terminal nodes must have zero edges
     for label, node in cfg.nodes.items():
         if node.terminal and node.edges:
-            raise ValueError(
-                f"CFG error: terminal node '{label}' has outgoing edges"
-            )
+            raise ValueError(f"CFG error: terminal node '{label}' has outgoing edges")
 
     # Validate: entry node must exist and be first
     if not cfg.nodes:
         raise ValueError("CFG error: no nodes in graph")
     first_label = next(iter(cfg.nodes))
     if first_label != "entry":
-        raise ValueError(
-            f"CFG error: first node must be 'entry', got '{first_label}'"
-        )
+        raise ValueError(f"CFG error: first node must be 'entry', got '{first_label}'")
 
     # Detect unreachable blocks via BFS from entry
     reachable = set()
@@ -133,7 +129,9 @@ def build_cfg(workflow: Workflow) -> CFG:
                 queue.append(predecessor)
 
     # Step 3: Dead ends = reachable but not terminating
-    dead_ends = [label for label in cfg.nodes if label in reachable and label not in terminating]
+    dead_ends = [
+        label for label in cfg.nodes if label in reachable and label not in terminating
+    ]
     if dead_ends:
         for label in dead_ends:
             print(f"error: dead-end block '{label}'")

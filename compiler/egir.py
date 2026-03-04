@@ -34,9 +34,7 @@ class EGIR:
             lines.append(f"ExecNode({nid!r})")
             for op in node.operations:
                 attrs = f"  {op.attributes}" if op.attributes else ""
-                lines.append(
-                    f"  {op.type}: {op.inputs} -> {op.outputs}{attrs}"
-                )
+                lines.append(f"  {op.type}: {op.inputs} -> {op.outputs}{attrs}")
             if node.terminal:
                 lines.append("  (terminal)")
             for edge in node.edges:

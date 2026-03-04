@@ -24,8 +24,7 @@ def build_egir(cfg: CFG) -> EGIR:
         exec_node = ExecNode(
             id=label,
             edges=[
-                ExecEdge(target=e.target, condition=e.condition)
-                for e in cfg_node.edges
+                ExecEdge(target=e.target, condition=e.condition) for e in cfg_node.edges
             ],
             terminal=cfg_node.terminal,
         )
