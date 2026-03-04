@@ -10,27 +10,45 @@ from air_ast import (
     Return,
     Parallel,
     Loop,
+    Route,
     Variable,
     Constructor,
     Instruction,
 )
 from cfg import CFG
-from egir import EGIR, ExecNode, ExecEdge, Operation
+from egir import EGIRWorkflow, ExecNode, ExecEdge, Operation
 
 
-def build_egir(cfg: CFG) -> EGIR:
-    egir = EGIR()
+def build_egir(cfg: CFG, workflow_name: str) -> EGIRWorkflow:
+    entry = next(iter(cfg.nodes))
+    egir = EGIRWorkflow(name=workflow_name, entry=entry)
     for label, cfg_node in cfg.nodes.items():
         exec_node = ExecNode(
-            id=label,
+            name=label,
             edges=[
                 ExecEdge(target=e.target, condition=e.condition) for e in cfg_node.edges
             ],
             terminal=cfg_node.terminal,
         )
         _convert_instructions(cfg_node.instructions, exec_node.operations)
-        egir.nodes[label] = exec_node
+        exec_node.route_variable = _find_route_variable(cfg_node.instructions)
+        egir.nodes.append(exec_node)
     return egir
+
+
+def _find_route_variable(instructions: list) -> str | None:
+    for inst in instructions:
+        if isinstance(inst, Route):
+            return inst.value
+        elif isinstance(inst, Loop):
+            result = _find_route_variable(inst.body)
+            if result:
+                return result
+        elif isinstance(inst, Parallel):
+            result = _find_route_variable(inst.branches)
+            if result:
+                return result
+    return None
 
 
 def _convert_instructions(instructions: list, ops: list):
@@ -56,40 +74,40 @@ def _convert_assign(inst: Assign) -> Operation | None:
             type="llm",
             inputs=[],
             outputs=outputs,
-            attributes={"prompt": expr.prompt},
+            params={"prompt": expr.prompt},
         )
     elif isinstance(expr, ToolCall):
         return Operation(
             type="tool",
             inputs=list(expr.args),
             outputs=outputs,
-            attributes={"name": expr.name},
+            params={"name": expr.name},
         )
     elif isinstance(expr, Transform):
-        attrs = {"target_type": expr.target_type.name}
+        params = {"target_type": expr.target_type.name}
         if expr.target_type.is_list:
-            attrs["target_type"] += "[]"
+            params["target_type"] += "[]"
         if expr.via:
-            attrs["via"] = expr.via.prompt
+            params["via"] = expr.via.prompt
         return Operation(
             type="transform",
             inputs=[expr.input],
             outputs=outputs,
-            attributes=attrs,
+            params=params,
         )
     elif isinstance(expr, Verify):
         return Operation(
             type="verify",
             inputs=[expr.input],
             outputs=outputs,
-            attributes={"rule": expr.rule},
+            params={"rule": expr.rule},
         )
     elif isinstance(expr, Aggregate):
         return Operation(
             type="aggregate",
             inputs=list(expr.inputs),
             outputs=outputs,
-            attributes={"strategy": expr.strategy},
+            params={"strategy": expr.strategy},
         )
     elif isinstance(expr, Gate):
         return Operation(
@@ -98,32 +116,36 @@ def _convert_assign(inst: Assign) -> Operation | None:
             outputs=outputs,
         )
     elif isinstance(expr, Decide):
-        attrs = {"provider": expr.provider}
+        params = {"provider": expr.provider}
         inputs = [expr.input] if expr.input else []
         return Operation(
             type="decide",
             inputs=inputs,
             outputs=outputs,
-            attributes=attrs,
+            params=params,
         )
     elif isinstance(expr, Constructor):
         return Operation(
             type="construct",
             inputs=[],
             outputs=outputs,
-            attributes={"type": expr.type_name, "fields": expr.fields},
+            params={"type": expr.type_name, "fields": expr.fields},
         )
-    # Variable assignments and others don't produce operations
     return None
 
 
 def _convert_return(inst: Return) -> Operation:
-    attrs = {}
     if isinstance(inst.value, Variable):
         return Operation(
             type="return",
             inputs=[inst.value.name],
             outputs=[],
-            attributes=attrs,
         )
-    return Operation(type="return", inputs=[], outputs=[], attributes=attrs)
+    if isinstance(inst.value, Constructor):
+        return Operation(
+            type="return",
+            inputs=[],
+            outputs=[],
+            params={"type": inst.value.type_name, "fields": inst.value.fields},
+        )
+    return Operation(type="return", inputs=[], outputs=[])

@@ -1,289 +1,296 @@
-# AIR Execution Graph Intermediate Representation Specification
+# Execution Graph Intermediate Representation
 Version: 0.1.0
 
 ## 1. Purpose
 
-The Execution Graph Intermediate Representation (EGIR) is the runtime-ready
-representation of an AIR workflow.
+EGIR (Execution Graph Intermediate Representation) is the executable form of an AIR workflow.
 
-Pipeline:
+Compilation pipeline:
 
 AIR source → AST → CFG → EGIR → Agent VM
 
-CFG expresses control flow.
+EGIR converts the structured AIR workflow into a flat execution graph suitable for runtime interpretation.
 
-EGIR expresses executable operations and data flow.
-
-The Agent VM executes EGIR nodes.
+The Agent VM executes EGIR nodes sequentially according to routing edges.
 
 ---
 
-## 2. EGIR Model
+# 2. Design Goals
 
-EGIR is a directed graph composed of execution nodes and edges.
+EGIR must be:
 
-```
+• deterministic
+• minimal
+• executable without additional inference
+• independent of frontend syntax
 
-EGIR {
-  nodes: Map<String, ExecNode>
-}
+All runtime information required for execution must be present in the graph.
 
-```
-
-Each node corresponds to a workflow block.
-
-Edges represent control flow transitions.
+The runtime must never infer missing semantics.
 
 ---
 
-## 3. ExecNode
+# 3. Workflow Structure
+
+An EGIR workflow is a directed graph.
 
 ```
 
-ExecNode {
-  id: String
-  operations: List<Operation>
-  edges: List<ExecEdge>
-  terminal: Boolean
-}
+EGIRWorkflow
 
 ```
 
 Fields:
 
-| Field | Description |
-|------|-------------|
-| id | node identifier (block label) |
-| operations | executable operations |
-| edges | outgoing execution edges |
-| terminal | whether the node terminates execution |
-
-Operations are derived from AST instructions.
+| Field | Type | Description |
+|------|------|-------------|
+| name | string | workflow name |
+| nodes | Map<string, ExecNode> | node table |
+| entry | string | entry node name |
 
 ---
 
-## 4. ExecEdge
+# 4. Execution Node
+
+Each node represents a block of operations followed by routing.
 
 ```
 
-ExecEdge {
-  target: String
-  condition: Optional<String>
-}
+ExecNode
 
 ```
 
 Fields:
 
-| Field | Description |
-|------|-------------|
-| target | destination node |
-| condition | routing condition |
-
-Edges correspond directly to CFG edges.
-
----
-
-## 5. Operation Model
-
-Each executable instruction becomes an Operation.
-
-```
-
-Operation {
-  type: OperationType
-  inputs: List<String>
-  outputs: List<String>
-  attributes: Map<String, Any>
-}
-
-```
+| Field | Type | Description |
+|------|------|-------------|
+| name | string | node identifier |
+| operations | Operation[] | ordered list of operations |
+| route_variable | string | variable used for routing |
+| edges | Edge[] | outgoing control-flow edges |
+| terminal | boolean | whether node terminates execution |
 
 ---
 
-## 6. Operation Types
+# 5. Edge
 
-### LLM
-
-Represents a language model call.
+Edges define control flow transitions between nodes.
 
 ```
 
-Operation {
-  type: "llm"
-  inputs: []
-  outputs: ["summary"]
-  attributes: { prompt: "summarize_aurora" }
-}
+Edge
 
 ```
 
----
+Fields:
 
-### Transform
+| Field | Type | Description |
+|------|------|-------------|
+| condition | string | routing condition |
+| target | string | destination node |
 
-Represents structured extraction or transformation.
+Examples:
 
 ```
 
-Operation {
-  type: "transform"
-  inputs: ["summary"]
-  outputs: ["claims"]
-  attributes: {
-    target_type: "Claim[]",
-    via: "extract_claims"
-  }
-}
+PROCEED
+ESCALATE
+RETRY
+HALT
+Fault
+Claim[]
+continue
 
 ```
 
 ---
 
-### Verify
+# 6. Operation
 
-Represents a verification rule.
+Operations are executable instructions.
+
+```
+
+Operation
 
 ```
 
-Operation {
-  type: "verify"
-  inputs: ["claims"]
-  outputs: ["verdict", "evidence"]
-  attributes: { rule: "product_existence" }
-}
+Fields:
 
-```
+| Field | Type | Description |
+|------|------|-------------|
+| type | string | operation type |
+| inputs | string[] | input variables |
+| outputs | string[] | output variables |
+| params | map | operation parameters |
 
 ---
 
-### Aggregate
+# 7. Operation Types
 
-Represents consensus aggregation.
+Supported operations in EGIR v0.1:
 
-```
-
-Operation {
-  type: "aggregate"
-  inputs: ["v1", "v2", "v3"]
-  outputs: ["consensus"]
-  attributes: { strategy: "majority" }
-}
-
-```
-
----
-
-### Gate
-
-Maps consensus/verdict to Outcome.
-
-```
-
-Operation {
-  type: "gate"
-  inputs: ["consensus"]
-  outputs: ["outcome"]
-}
-
-```
+| Operation | Description |
+|----------|-------------|
+| llm | language model invocation |
+| transform | LLM-based extraction |
+| verify | rule-based verification |
+| aggregate | consensus computation |
+| gate | verdict → outcome mapping |
+| decide | external decision provider |
+| return | workflow termination |
 
 ---
 
-### Decide
+# 8. Example Node
 
-Represents external decision providers.
-
-```
-
-Operation {
-  type: "decide"
-  inputs: ["summary"]
-  outputs: ["message", "outcome"]
-  attributes: { provider: "human_reviewer" }
-}
-
-```
-
----
-
-### Return
-
-Marks terminal execution.
-
-```
-
-Operation {
-  type: "return"
-  inputs: []
-  outputs: []
-  attributes: { type: "Artifact" }
-}
-
-```
-
----
-
-## 7. Mapping From CFG
-
-Each CFG node becomes an ExecNode.
-
-Operations are produced by translating AST instructions.
-
-CFG edges become ExecEdges.
-
-Example:
-
-CFG:
-
-```
-
-verification
--> publish [PROCEED]
--> review  [ESCALATE]
-
-```
-
-EGIR:
+Example EGIR node generated from AIR:
 
 ```
 
 ExecNode("verification")
+
+operations:
+verify ["claims"] -> ["v1"] {rule: "product_existence"}
+verify ["claims"] -> ["v2"] {rule: "link_validation"}
+verify ["claims"] -> ["v3"] {rule: "compute_claim"}
+aggregate ["v1","v2","v3"] -> ["consensus"] {strategy: "majority"}
+gate ["consensus"] -> ["outcome"]
+
+route_variable: "outcome"
+
 edges:
-publish [PROCEED]
-review  [ESCALATE]
+PROCEED  → publish
+ESCALATE → review
+RETRY    → regenerate
+HALT     → abort
 
 ```
 
 ---
 
-## 8. Execution Semantics
+# 9. Routing Semantics
 
-The Agent VM executes EGIR as follows:
+Routing uses the node's `route_variable`.
 
-1. Start at entry node.
-2. Execute node operations sequentially.
-3. Evaluate route condition.
-4. Follow matching edge.
-5. Continue until terminal node.
+```
+
+value = variables[node.route_variable]
+
+```
+
+Edge selection:
+
+```
+
+for edge in node.edges:
+if edge.condition == value:
+next_node = edge.target
+
+```
+
+The runtime must not infer routing variables.
+
+The variable must always be explicitly defined in the node.
 
 ---
 
-## 9. Parallel Semantics
+# 10. Loop Representation
 
-Parallel blocks produce multiple operations inside a node.
+Loops are represented as self-edges.
 
-Execution engines may schedule them concurrently.
+Example:
+
+```
+
+Edge:
+condition = "continue"
+target = "regenerate"
+
+```
+
+This creates a loop back-edge.
+
+Loop limits are enforced using metadata attached to nodes.
 
 ---
 
-## 10. Guarantees
+# 11. Terminal Nodes
 
-EGIR assumes CFG validation has already ensured:
+Nodes that contain a `return` operation are terminal.
 
-- no unreachable nodes
-- no unknown targets
-- no dead-end cycles
-- terminal correctness
+```
 
-Therefore EGIR is safe for execution.
+terminal = true
+
+```
+
+Terminal nodes must not have outgoing edges.
+
+---
+
+# 12. Example Workflow Graph
+
+Simplified EGIR:
+
+```
+
+entry
+→ verification [Claim[]]
+→ regenerate   [Fault]
+
+verification
+→ publish  [PROCEED]
+→ review   [ESCALATE]
+→ regenerate [RETRY]
+→ abort [HALT]
+
+publish
+(terminal)
+
+abort
+(terminal)
+
+```
+
+---
+
+# 13. Runtime Responsibilities
+
+The Agent VM must:
+
+• execute node operations sequentially
+• maintain variable store
+• evaluate routing conditions
+• follow edges
+• terminate on return
+
+The runtime must not modify graph structure.
+
+---
+
+# 14. Compiler Responsibilities
+
+The compiler must ensure EGIR is valid.
+
+Validation includes:
+
+• no unreachable nodes
+• no dead-end cycles
+• correct routing variables
+• valid edge targets
+• terminal nodes have no outgoing edges
+
+EGIR must be executable without additional semantic analysis.
+
+---
+
+# 15. Future Extensions
+
+Future EGIR versions may support:
+
+• distributed execution
+• streaming outputs
+• dynamic node scaling
+• checkpointing
+• typed variable storage

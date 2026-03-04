@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EGIR Workflow",
+  "description": "AIR Execution Graph Intermediate Representation v0.1.0",
+  "type": "object",
+  "required": ["workflow", "entry", "nodes"],
+  "additionalProperties": false,
+  "properties": {
+    "workflow": {
+      "type": "string",
+      "description": "Workflow name"
+    },
+    "entry": {
+      "type": "string",
+      "description": "Entry node name"
+    },
+    "nodes": {
+      "type": "object",
+      "description": "Execution nodes keyed by name",
+      "additionalProperties": {
+        "$ref": "#/$defs/ExecNode"
+      }
+    }
+  },
+  "$defs": {
+    "ExecNode": {
+      "type": "object",
+      "required": ["operations", "terminal"],
+      "additionalProperties": false,
+      "properties": {
+        "operations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Operation" }
+        },
+        "route_variable": {
+          "type": "string",
+          "description": "Variable used for routing"
+        },
+        "edges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Edge" }
+        },
+        "terminal": {
+          "type": "boolean"
+        }
+      },
+      "if": {
+        "properties": { "terminal": { "const": false } }
+      },
+      "then": {
+        "required": ["operations", "route_variable", "edges", "terminal"]
+      },
+      "else": {
+        "not": {
+          "required": ["edges"]
+        }
+      }
+    },
+    "Operation": {
+      "type": "object",
+      "required": ["type", "inputs", "outputs", "params"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["llm", "transform", "verify", "aggregate", "gate", "decide", "return", "tool", "construct"]
+        },
+        "inputs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "outputs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "params": {
+          "type": "object"
+        }
+      }
+    },
+    "Edge": {
+      "type": "object",
+      "required": ["condition", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
