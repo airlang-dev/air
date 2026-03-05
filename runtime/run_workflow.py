@@ -9,7 +9,7 @@ from runtime.agent_vm import execute_workflow
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python runtime/run_workflow.py <workflow.egir.json>")
+        print("Usage: python runtime/run_workflow.py <workflow.airc>")
         sys.exit(1)
 
     path = sys.argv[1]

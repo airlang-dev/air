@@ -75,7 +75,7 @@ def compile_air(input_file, output_path):
                 out = output_path
             else:
                 os.makedirs(os.path.join(project_root, "build"), exist_ok=True)
-                out = os.path.join(project_root, "build", f"{wf.name}.egir.json")
+                out = os.path.join(project_root, "build", f"{wf.name}.airc")
 
             write_egir_json(egir, out)
             print(f"[✓] Artifact written: {out}")
