@@ -10,17 +10,38 @@ _SCHEMA_PATH = os.path.join(
 )
 
 
+def serialize_output(output):
+    result = {"name": output.name}
+    if output.type:
+        result["type"] = output.type
+    return result
+
+
 def serialize_operation(op):
     return {
         "type": op.type,
         "inputs": op.inputs,
-        "outputs": op.outputs,
+        "outputs": [serialize_output(o) for o in op.outputs],
         "params": op.params if op.params else {},
     }
 
 
+def serialize_condition(condition):
+    result = {"kind": condition.kind}
+    if condition.name is not None:
+        result["name"] = condition.name
+    if condition.value is not None:
+        result["value"] = condition.value
+    if condition.is_list:
+        result["is_list"] = condition.is_list
+    return result
+
+
 def serialize_edge(edge):
-    return {"condition": edge.condition, "target": edge.target}
+    result = {"target": edge.target}
+    if edge.condition:
+        result["condition"] = serialize_condition(edge.condition)
+    return result
 
 
 def serialize_node(node):

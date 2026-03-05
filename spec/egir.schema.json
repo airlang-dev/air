@@ -75,23 +75,56 @@
         },
         "outputs": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": { "$ref": "#/$defs/Output" }
         },
         "params": {
           "type": "object"
         }
       }
     },
+    "Output": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      }
+    },
     "Edge": {
       "type": "object",
-      "required": ["condition", "target"],
+      "required": ["target"],
       "additionalProperties": false,
       "properties": {
         "condition": {
-          "type": "string"
+          "$ref": "#/$defs/Condition"
         },
         "target": {
           "type": "string"
+        }
+      }
+    },
+    "Condition": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["type", "enum", "continue"]
+        },
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "is_list": {
+          "type": "boolean"
         }
       }
     }

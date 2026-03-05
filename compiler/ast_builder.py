@@ -256,6 +256,9 @@ class ASTBuilder:
             if val == "default":
                 return DefaultPattern()
 
+            if val in {"Message", "Artifact", "Fault", "Verdict", "Consensus", "Outcome", "Evidence"}:
+                return TypePattern(val)
+
             return EnumPattern(val)
 
         if isinstance(node, Tree):
