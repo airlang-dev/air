@@ -1,15 +1,15 @@
-# EGIR JSON Schema
+# AIR Graph JSON Schema
 Version: 0.1.0
 
 ## Purpose
 
-EGIR JSON is the serialized execution graph produced by the AIR compiler.
+AIR Graph JSON is the serialized execution graph produced by the AIR compiler.
 
 Pipeline:
 
-AIR → AST → CFG → EGIR → **EGIR JSON** → Agent VM
+AIR → AST → CFG → AIR Graph → **AIR Graph JSON** → Agent VM
 
-EGIR JSON is the **runtime artifact** consumed by the Agent Virtual Machine.
+AIR Graph JSON is the **runtime artifact** consumed by the Agent Virtual Machine.
 
 ---
 
@@ -17,7 +17,7 @@ EGIR JSON is the **runtime artifact** consumed by the Agent Virtual Machine.
 
 ```
 
-EGIRWorkflow
+AirGraphWorkflow
 
 ````
 

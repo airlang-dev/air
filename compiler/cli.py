@@ -9,13 +9,13 @@ def main():
     parser = argparse.ArgumentParser(prog="air", description="AIR compiler")
     sub = parser.add_subparsers(dest="command")
 
-    compile_p = sub.add_parser("compile", help="Compile AIR source to EGIR JSON")
+    compile_p = sub.add_parser("compile", help="Compile AIR source to AIR Graph (.airc)")
     compile_p.add_argument("file", help="Path to .air source file")
-    compile_p.add_argument("--output", "-o", help="Output path (default: build/<name>.egir.json)")
+    compile_p.add_argument("--output", "-o", help="Output path (default: build/<name>.airc)")
 
-    backend_p = sub.add_parser("backend", help="Generate backend artifact from EGIR")
+    backend_p = sub.add_parser("backend", help="Generate backend artifact from AIR Graph")
     backend_p.add_argument("backend_name", help="Backend name (e.g. langgraph)")
-    backend_p.add_argument("egir_file", help="Path to EGIR JSON file")
+    backend_p.add_argument("air_graph_file", help="Path to AIR Graph (.airc) file")
     backend_p.add_argument("--output", "-o", help="Output path")
 
     args = parser.parse_args()
@@ -23,7 +23,7 @@ def main():
     if args.command == "compile":
         compile_air(args.file, args.output)
     elif args.command == "backend":
-        run_backend(args.backend_name, args.egir_file, args.output)
+        run_backend(args.backend_name, args.air_graph_file, args.output)
     else:
         parser.print_help()
         sys.exit(1)
@@ -54,8 +54,8 @@ def compile_air(input_file, output_path):
         from semantic_check import SemanticChecker
         from ast_builder import ASTBuilder
         from cfg_builder import build_cfg
-        from egir.builder import build_egir
-        from egir.serializer import write_egir_json
+        from air_graph.builder import build_air_graph
+        from air_graph.serializer import write_airc
 
         checker = SemanticChecker(tree)
         checker.run()
@@ -68,8 +68,8 @@ def compile_air(input_file, output_path):
             cfg = build_cfg(wf)
             print("[✓] CFG built")
 
-            egir = build_egir(cfg, wf.name)
-            print("[✓] EGIR built")
+            air_graph = build_air_graph(cfg, wf.name)
+            print("[✓] AIR Graph built")
 
             if output_path:
                 out = output_path
@@ -77,7 +77,7 @@ def compile_air(input_file, output_path):
                 os.makedirs(os.path.join(project_root, "build"), exist_ok=True)
                 out = os.path.join(project_root, "build", f"{wf.name}.airc")
 
-            write_egir_json(egir, out)
+            write_airc(air_graph, out)
             print(f"[✓] Artifact written: {out}")
 
     except UnexpectedInput as e:
@@ -91,7 +91,7 @@ BACKENDS = {
 }
 
 
-def run_backend(backend_name, egir_file, output_path):
+def run_backend(backend_name, air_graph_file, output_path):
     import json
 
     if backend_name not in BACKENDS:
@@ -99,9 +99,9 @@ def run_backend(backend_name, egir_file, output_path):
         print(f"    Available: {', '.join(BACKENDS)}")
         sys.exit(1)
 
-    with open(egir_file) as f:
-        egir = json.load(f)
-    print("[✓] Loaded EGIR artifact")
+    with open(air_graph_file) as f:
+        air_graph = json.load(f)
+    print("[✓] Loaded AIR Graph artifact")
 
     module_path, class_name = BACKENDS[backend_name].rsplit(":", 1)
     from importlib import import_module
@@ -111,8 +111,8 @@ def run_backend(backend_name, egir_file, output_path):
     backend = backend_cls()
     print(f"[✓] Backend: {backend_name}")
 
-    code = backend.compile(egir, output_path)
-    out = output_path or f"build/{egir['workflow']}_langgraph.py"
+    code = backend.compile(air_graph, output_path)
+    out = output_path or f"build/{air_graph['workflow']}_langgraph.py"
     print(f"[✓] Generated: {out}")
 
 

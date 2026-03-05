@@ -101,7 +101,7 @@ AIR source (.air)
       ↓
   [TODO] CFG builder (spec: 03_air_cfg_spec_v0_1_0.md)
       ↓
-  [TODO] EGIR (Execution Graph IR)
+  [TODO] AIR Graph
       ↓
   [TODO] Agent VM
 ```
@@ -120,7 +120,7 @@ AIR source (.air)
 - [ ] CFG builder (spec exists in `03_air_cfg_spec_v0_1_0.md`)
 - [ ] Type system validation (type coupling rules, Section 22 of language spec)
 - [ ] Reachability / dead code analysis
-- [ ] EGIR compilation
+- [ ] AIR Graph compilation
 - [ ] Agent VM runtime integration
 - [ ] Error messages with source locations
 - [ ] CLI tooling

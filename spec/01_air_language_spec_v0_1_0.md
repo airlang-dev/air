@@ -20,18 +20,51 @@ AIR workflows compile into execution graphs executed by the **Agent VM** or comp
 AIR stack:
 
 ```
-DSL / Visual / NL
-        ↓
-   AIR Compiler
-        ↓
-        AIR
-        ↓
-       EGIR
-        ↓
-      Agent VM
-        ↓
-   LLMs / Tools / Decision Providers
+                       DSL / Visual / NL
+                               ↓
+                 ┌──────────────────────────┐
+                 │        AIR Source        │
+                 │        (*.air)           │
+                 │  Workflow topology DSL   │
+                 └─────────────┬────────────┘
+                               │
+                               │  Parse + Semantic Analysis
+                               ▼
+                     ┌──────────────────┐
+                     │      AST         │
+                     │ AIR Syntax Tree  │
+                     └────────┬─────────┘
+                              │
+                              │  Compile
+                              ▼
+                   ┌──────────────────────┐
+                   │      AIR Graph       │
+                   │         (IR)         │
+                   │   (*.airc artifact)  │
+                   └─────────┬────────────┘
+                             │
+                ┌────────────┼───────────────┐
+                │            │               │
+                ▼            ▼               ▼
+      ┌──────────────┐   ┌───────────────┐   ┌──────────────┐
+      │   Agent VM   │   │   LangGraph   │   │  Future      │
+      │ AIR Runtime  │   │   Backend     │   │  Backends    │
+      │              │   │               │   │              │
+      │ EGIR Engine  │   │ Python Graph  │   │ e.g.         │
+      │              │   │ Execution     │   │ Temporal     │
+      │              │   │               │   │ Ray          │
+      │              │   │               │   │ Beam         │
+      └──────┬───────┘   └──────┬────────┘   └──────┬───────┘
+             │                  │                   │
+             ▼                  ▼                   ▼
+     ┌─────────────────────────────────────────────────────┐
+     │                 Execution Adapters                  │
+     │                                                     │
+     │  LLMs     Tools     Humans     Policies     APIs    │
+     └─────────────────────────────────────────────────────┘
 ```
+
+> The AIR compiler lowers AIR programs into an AIR Graph (the AIR IR), serialized as .airc.
 
 ---
 
@@ -1031,5 +1064,5 @@ Additional AIR specifications define:
 * **ATS** — type system
 * **EBNF** — grammar
 * **AST** — compiler representation
-* **EGIR** — execution graph
+* **AIR Graph** — execution graph
 * **AVM** — Agent VM runtime

@@ -3,10 +3,10 @@ import os
 
 import jsonschema
 
-from egir.schema import EGIR_VERSION
+from air_graph.schema import AIR_GRAPH_VERSION
 
 _SCHEMA_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "spec", "egir.schema.json"
+    os.path.dirname(__file__), "..", "..", "spec", "air_graph.schema.json"
 )
 
 
@@ -55,16 +55,16 @@ def serialize_node(node):
     return result
 
 
-def serialize_egir(workflow) -> dict:
+def serialize_air_graph(workflow) -> dict:
     return {
-        "egir_version": EGIR_VERSION,
+        "air_graph_version": AIR_GRAPH_VERSION,
         "workflow": workflow.name,
         "entry": workflow.entry,
         "nodes": {n.name: serialize_node(n) for n in workflow.nodes},
     }
 
 
-def validate_egir(data):
+def validate_air_graph(data):
     with open(_SCHEMA_PATH) as f:
         schema = json.load(f)
     jsonschema.validate(instance=data, schema=schema)
@@ -80,11 +80,11 @@ def validate_egir(data):
             )
 
 
-def write_egir_json(workflow, output_file):
-    data = serialize_egir(workflow)
-    validate_egir(data)
+def write_airc(workflow, output_file):
+    data = serialize_air_graph(workflow)
+    validate_air_graph(data)
 
     with open(output_file, "w") as f:
         json.dump(data, f, indent=2)
 
-    print(f"[✓] EGIR JSON written to {output_file}")
+    print(f"[✓] AIR Graph written to {output_file}")

@@ -3,13 +3,13 @@ Version: 0.1.0
 
 ## 1. Purpose
 
-The Agent Virtual Machine (AVM) executes AIR workflows compiled into EGIR.
+The Agent Virtual Machine (AVM) executes AIR workflows compiled into AIR Graph.
 
 Pipeline:
 
-AIR source → AST → CFG → EGIR → Agent VM
+AIR source → AST → CFG → AIR Graph → Agent VM
 
-The AVM interprets the EGIR execution graph and orchestrates:
+The AVM interprets the AIR Graph execution graph and orchestrates:
 
 - LLM calls
 - verification rules
@@ -24,7 +24,7 @@ even though underlying model calls may be nondeterministic.
 
 ## 2. Execution Model
 
-The AVM executes EGIR nodes sequentially according to graph edges.
+The AVM executes AIR Graph nodes sequentially according to graph edges.
 
 Execution begins at the **entry node** and continues until a **terminal node** is reached.
 
@@ -297,7 +297,7 @@ regenerate → regenerate [continue]
 
 The VM simply follows the edge.
 
-Loop limits are enforced by counters defined in the EGIR metadata.
+Loop limits are enforced by counters defined in the AIR Graph metadata.
 
 If the limit is exceeded:
 
@@ -410,7 +410,7 @@ Agent VM
 
 The VM is platform-independent.
 
-Backends (LangGraph, Bedrock, Dify) may compile EGIR into
+Backends (LangGraph, Bedrock, Dify) may compile AIR Graph into
 native runtime constructs.
 
 ---

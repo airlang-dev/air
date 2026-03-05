@@ -6,7 +6,7 @@ Version: 0.1.0
 The Control Flow Graph (CFG) is the intermediate representation that converts
 structured AIR workflows into an explicit graph of execution nodes.
 
-AIR source → AST → CFG → EGIR → Agent VM
+AIR source → AST → CFG → AIR Graph → Agent VM
 
 The CFG represents control flow explicitly using nodes and edges.
 
@@ -315,4 +315,4 @@ CFG
 
 ```
 
-The CFG will later be lowered into EGIR.
+The CFG will later be lowered into AIR Graph.

@@ -1,14 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "EGIR Workflow",
-  "description": "AIR Execution Graph Intermediate Representation v0.1.0",
+  "title": "AIR Graph Workflow",
+  "description": "AIR Graph v0.1.0",
   "type": "object",
-  "required": ["egir_version", "workflow", "entry", "nodes"],
+  "required": ["air_graph_version", "workflow", "entry", "nodes"],
   "additionalProperties": false,
   "properties": {
-    "egir_version": {
+    "air_graph_version": {
       "type": "string",
-      "description": "EGIR format version"
+      "description": "AIR Graph format version"
     },
     "workflow": {
       "type": "string",

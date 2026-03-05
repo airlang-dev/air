@@ -18,32 +18,32 @@ from air_ast import (
     DefaultPattern,
 )
 from cfg import CFG
-from egir.schema import (
-    EgirWorkflow,
-    EgirNode,
-    EgirEdge,
-    EgirOperation,
-    EgirCondition,
-    EgirOutput,
+from air_graph.schema import (
+    AirGraphWorkflow,
+    AirGraphNode,
+    AirGraphEdge,
+    AirGraphOperation,
+    AirGraphCondition,
+    AirGraphOutput,
 )
 
 
-def build_egir(cfg: CFG, workflow_name: str) -> EgirWorkflow:
+def build_air_graph(cfg: CFG, workflow_name: str) -> AirGraphWorkflow:
     entry = next(iter(cfg.nodes))
-    egir = EgirWorkflow(name=workflow_name, entry=entry)
+    graph = AirGraphWorkflow(name=workflow_name, entry=entry)
     for label, cfg_node in cfg.nodes.items():
-        node = EgirNode(
+        node = AirGraphNode(
             name=label,
             terminal=cfg_node.terminal,
         )
         _convert_instructions(cfg_node.instructions, node.operations)
         node.route_variable = _find_route_variable(cfg_node.instructions)
         node.edges = _build_edges(cfg_node.instructions, label)
-        egir.nodes.append(node)
-    return egir
+        graph.nodes.append(node)
+    return graph
 
 
-def _build_edges(instructions: list, node_label: str) -> list[EgirEdge]:
+def _build_edges(instructions: list, node_label: str) -> list[AirGraphEdge]:
     edges = []
     for inst in instructions:
         if isinstance(inst, Route):
@@ -51,10 +51,10 @@ def _build_edges(instructions: list, node_label: str) -> list[EgirEdge]:
                 condition = _pattern_to_condition(case.pattern)
                 if case.target == "continue":
                     target = node_label
-                    condition = EgirCondition(kind="continue")
+                    condition = AirGraphCondition(kind="continue")
                 else:
                     target = case.target
-                edges.append(EgirEdge(target=target, condition=condition))
+                edges.append(AirGraphEdge(target=target, condition=condition))
         elif isinstance(inst, Loop):
             edges.extend(_build_edges(inst.body, node_label))
         elif isinstance(inst, Parallel):
@@ -62,16 +62,16 @@ def _build_edges(instructions: list, node_label: str) -> list[EgirEdge]:
     return edges
 
 
-def _pattern_to_condition(pattern) -> EgirCondition:
+def _pattern_to_condition(pattern) -> AirGraphCondition:
     if isinstance(pattern, EnumPattern):
-        return EgirCondition(kind="enum", name="Signal", value=pattern.value)
+        return AirGraphCondition(kind="enum", name="Signal", value=pattern.value)
     elif isinstance(pattern, TypePattern):
-        return EgirCondition(
+        return AirGraphCondition(
             kind="type", name=pattern.name, is_list=pattern.is_list
         )
     elif isinstance(pattern, DefaultPattern):
-        return EgirCondition(kind="enum", name="default", value="default")
-    return EgirCondition(kind="enum", value=str(pattern))
+        return AirGraphCondition(kind="enum", name="default", value="default")
+    return AirGraphCondition(kind="enum", value=str(pattern))
 
 
 def _find_route_variable(instructions: list) -> str | None:
@@ -103,23 +103,23 @@ def _convert_instructions(instructions: list, ops: list):
             _convert_instructions(inst.body, ops)
 
 
-def _typed_outputs(names: list[str], type_name: str) -> list[EgirOutput]:
-    return [EgirOutput(name=n, type=type_name) for n in names]
+def _typed_outputs(names: list[str], type_name: str) -> list[AirGraphOutput]:
+    return [AirGraphOutput(name=n, type=type_name) for n in names]
 
 
-def _convert_assign(inst: Assign) -> EgirOperation | None:
+def _convert_assign(inst: Assign) -> AirGraphOperation | None:
     expr = inst.value
     raw = [t for t in inst.targets if t != "_"]
 
     if isinstance(expr, LLMCall):
-        return EgirOperation(
+        return AirGraphOperation(
             type="llm",
             inputs=[],
             outputs=_typed_outputs(raw, "Message"),
             params={"prompt": expr.prompt},
         )
     elif isinstance(expr, ToolCall):
-        return EgirOperation(
+        return AirGraphOperation(
             type="tool",
             inputs=list(expr.args),
             outputs=_typed_outputs(raw, "Artifact"),
@@ -134,7 +134,7 @@ def _convert_assign(inst: Assign) -> EgirOperation | None:
             out_type = expr.target_type.name
         if expr.via:
             params["via"] = expr.via.prompt
-        return EgirOperation(
+        return AirGraphOperation(
             type="transform",
             inputs=[expr.input],
             outputs=_typed_outputs(raw, out_type),
@@ -143,24 +143,24 @@ def _convert_assign(inst: Assign) -> EgirOperation | None:
     elif isinstance(expr, Verify):
         outputs = []
         for i, name in enumerate(raw):
-            outputs.append(EgirOutput(
+            outputs.append(AirGraphOutput(
                 name=name, type="Verdict" if i == 0 else "Evidence"
             ))
-        return EgirOperation(
+        return AirGraphOperation(
             type="verify",
             inputs=[expr.input],
             outputs=outputs,
             params={"rule": expr.rule},
         )
     elif isinstance(expr, Aggregate):
-        return EgirOperation(
+        return AirGraphOperation(
             type="aggregate",
             inputs=list(expr.inputs),
             outputs=_typed_outputs(raw, "Consensus"),
             params={"strategy": expr.strategy},
         )
     elif isinstance(expr, Gate):
-        return EgirOperation(
+        return AirGraphOperation(
             type="gate",
             inputs=[expr.input],
             outputs=_typed_outputs(raw, "Outcome"),
@@ -170,17 +170,17 @@ def _convert_assign(inst: Assign) -> EgirOperation | None:
         inputs = [expr.input] if expr.input else []
         outputs = []
         for i, name in enumerate(raw):
-            outputs.append(EgirOutput(
+            outputs.append(AirGraphOutput(
                 name=name, type="Message" if i == 0 else "Outcome"
             ))
-        return EgirOperation(
+        return AirGraphOperation(
             type="decide",
             inputs=inputs,
             outputs=outputs,
             params=params,
         )
     elif isinstance(expr, Constructor):
-        return EgirOperation(
+        return AirGraphOperation(
             type="construct",
             inputs=[],
             outputs=_typed_outputs(raw, expr.type_name),
@@ -189,18 +189,18 @@ def _convert_assign(inst: Assign) -> EgirOperation | None:
     return None
 
 
-def _convert_return(inst: Return) -> EgirOperation:
+def _convert_return(inst: Return) -> AirGraphOperation:
     if isinstance(inst.value, Variable):
-        return EgirOperation(
+        return AirGraphOperation(
             type="return",
             inputs=[inst.value.name],
             outputs=[],
         )
     if isinstance(inst.value, Constructor):
-        return EgirOperation(
+        return AirGraphOperation(
             type="return",
             inputs=[],
             outputs=[],
             params={"type": inst.value.type_name, "fields": inst.value.fields},
         )
-    return EgirOperation(type="return", inputs=[], outputs=[])
+    return AirGraphOperation(type="return", inputs=[], outputs=[])

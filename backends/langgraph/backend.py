@@ -29,10 +29,10 @@ class _CodeWriter:
 
 
 class LangGraphBackend(Backend):
-    def compile(self, egir: dict, output_path: str = None) -> str:
-        workflow = egir["workflow"]
-        entry = egir["entry"]
-        nodes = egir["nodes"]
+    def compile(self, air_graph: dict, output_path: str = None) -> str:
+        workflow = air_graph["workflow"]
+        entry = air_graph["entry"]
+        nodes = air_graph["nodes"]
 
         if output_path is None:
             output_path = f"build/{workflow}_langgraph.py"

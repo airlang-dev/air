@@ -9,7 +9,7 @@ The AST is the input for:
 
 - type checking
 - control-flow analysis
-- EGIR lowering
+- AIR Graph lowering
 - execution planning
 
 ---
@@ -334,4 +334,4 @@ Routes define edges.
 
 # 25. Lowering
 
-The AST is lowered to EGIR (Execution Graph IR) for runtime execution.
+The AST is lowered to AIR Graph (AIR Graph) for runtime execution.

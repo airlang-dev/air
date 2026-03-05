@@ -1,23 +1,23 @@
-# Execution Graph Intermediate Representation
+# AIR Graph
 Version: 0.1.0
 
 ## 1. Purpose
 
-EGIR (Execution Graph Intermediate Representation) is the executable form of an AIR workflow.
+AIR Graph is the executable form of an AIR workflow.
 
 Compilation pipeline:
 
-AIR source → AST → CFG → EGIR → Agent VM
+AIR source → AST → CFG → AIR Graph → Agent VM
 
-EGIR converts the structured AIR workflow into a flat execution graph suitable for runtime interpretation.
+AIR Graph converts the structured AIR workflow into a flat execution graph suitable for runtime interpretation.
 
-The Agent VM executes EGIR nodes sequentially according to routing edges.
+The Agent VM executes AIR Graph nodes sequentially according to routing edges.
 
 ---
 
 # 2. Design Goals
 
-EGIR must be:
+AIR Graph must be:
 
 • deterministic
 • minimal
@@ -32,11 +32,11 @@ The runtime must never infer missing semantics.
 
 # 3. Workflow Structure
 
-An EGIR workflow is a directed graph.
+An AIR Graph workflow is a directed graph.
 
 ```
 
-EGIRWorkflow
+AirGraphWorkflow
 
 ```
 
@@ -128,7 +128,7 @@ Fields:
 
 # 7. Operation Types
 
-Supported operations in EGIR v0.1:
+Supported operations in AIR Graph v0.1:
 
 | Operation | Description |
 |----------|-------------|
@@ -144,7 +144,7 @@ Supported operations in EGIR v0.1:
 
 # 8. Example Node
 
-Example EGIR node generated from AIR:
+Example AIR Graph node generated from AIR:
 
 ```
 
@@ -231,7 +231,7 @@ Terminal nodes must not have outgoing edges.
 
 # 12. Example Workflow Graph
 
-Simplified EGIR:
+Simplified AIR Graph:
 
 ```
 
@@ -271,7 +271,7 @@ The runtime must not modify graph structure.
 
 # 14. Compiler Responsibilities
 
-The compiler must ensure EGIR is valid.
+The compiler must ensure AIR Graph is valid.
 
 Validation includes:
 
@@ -281,13 +281,13 @@ Validation includes:
 • valid edge targets
 • terminal nodes have no outgoing edges
 
-EGIR must be executable without additional semantic analysis.
+AIR Graph must be executable without additional semantic analysis.
 
 ---
 
 # 15. Future Extensions
 
-Future EGIR versions may support:
+Future AIR Graph versions may support:
 
 • distributed execution
 • streaming outputs

@@ -1,6 +1,6 @@
 @air 0.1
 
-workflow Terminal_Node_EGIR_Test -> Artifact | Fault
+workflow Terminal_Node_Test -> Artifact | Fault
 
 summary = llm(summarize)
 

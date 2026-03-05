@@ -1,9 +1,9 @@
 class Backend:
-    """Base interface for EGIR execution backends.
+    """Base interface for AIR Graph execution backends.
 
-    Backends consume a serialized EGIR artifact (dict) and produce
+    Backends consume a serialized AIR Graph artifact (dict) and produce
     execution results. All backends must implement the compile method.
     """
 
-    def compile(self, egir: dict):
+    def compile(self, air_graph: dict):
         raise NotImplementedError
