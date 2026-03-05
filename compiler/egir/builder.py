@@ -13,26 +13,26 @@ from air_ast import (
     Route,
     Variable,
     Constructor,
-    Instruction,
 )
 from cfg import CFG
-from egir import EGIRWorkflow, ExecNode, ExecEdge, Operation
+from egir.schema import EgirWorkflow, EgirNode, EgirEdge, EgirOperation
 
 
-def build_egir(cfg: CFG, workflow_name: str) -> EGIRWorkflow:
+def build_egir(cfg: CFG, workflow_name: str) -> EgirWorkflow:
     entry = next(iter(cfg.nodes))
-    egir = EGIRWorkflow(name=workflow_name, entry=entry)
+    egir = EgirWorkflow(name=workflow_name, entry=entry)
     for label, cfg_node in cfg.nodes.items():
-        exec_node = ExecNode(
+        node = EgirNode(
             name=label,
             edges=[
-                ExecEdge(target=e.target, condition=e.condition) for e in cfg_node.edges
+                EgirEdge(target=e.target, condition=e.condition)
+                for e in cfg_node.edges
             ],
             terminal=cfg_node.terminal,
         )
-        _convert_instructions(cfg_node.instructions, exec_node.operations)
-        exec_node.route_variable = _find_route_variable(cfg_node.instructions)
-        egir.nodes.append(exec_node)
+        _convert_instructions(cfg_node.instructions, node.operations)
+        node.route_variable = _find_route_variable(cfg_node.instructions)
+        egir.nodes.append(node)
     return egir
 
 
@@ -65,19 +65,19 @@ def _convert_instructions(instructions: list, ops: list):
             _convert_instructions(inst.body, ops)
 
 
-def _convert_assign(inst: Assign) -> Operation | None:
+def _convert_assign(inst: Assign) -> EgirOperation | None:
     expr = inst.value
     outputs = [t for t in inst.targets if t != "_"]
 
     if isinstance(expr, LLMCall):
-        return Operation(
+        return EgirOperation(
             type="llm",
             inputs=[],
             outputs=outputs,
             params={"prompt": expr.prompt},
         )
     elif isinstance(expr, ToolCall):
-        return Operation(
+        return EgirOperation(
             type="tool",
             inputs=list(expr.args),
             outputs=outputs,
@@ -89,28 +89,28 @@ def _convert_assign(inst: Assign) -> Operation | None:
             params["target_type"] += "[]"
         if expr.via:
             params["via"] = expr.via.prompt
-        return Operation(
+        return EgirOperation(
             type="transform",
             inputs=[expr.input],
             outputs=outputs,
             params=params,
         )
     elif isinstance(expr, Verify):
-        return Operation(
+        return EgirOperation(
             type="verify",
             inputs=[expr.input],
             outputs=outputs,
             params={"rule": expr.rule},
         )
     elif isinstance(expr, Aggregate):
-        return Operation(
+        return EgirOperation(
             type="aggregate",
             inputs=list(expr.inputs),
             outputs=outputs,
             params={"strategy": expr.strategy},
         )
     elif isinstance(expr, Gate):
-        return Operation(
+        return EgirOperation(
             type="gate",
             inputs=[expr.input],
             outputs=outputs,
@@ -118,14 +118,14 @@ def _convert_assign(inst: Assign) -> Operation | None:
     elif isinstance(expr, Decide):
         params = {"provider": expr.provider}
         inputs = [expr.input] if expr.input else []
-        return Operation(
+        return EgirOperation(
             type="decide",
             inputs=inputs,
             outputs=outputs,
             params=params,
         )
     elif isinstance(expr, Constructor):
-        return Operation(
+        return EgirOperation(
             type="construct",
             inputs=[],
             outputs=outputs,
@@ -134,18 +134,18 @@ def _convert_assign(inst: Assign) -> Operation | None:
     return None
 
 
-def _convert_return(inst: Return) -> Operation:
+def _convert_return(inst: Return) -> EgirOperation:
     if isinstance(inst.value, Variable):
-        return Operation(
+        return EgirOperation(
             type="return",
             inputs=[inst.value.name],
             outputs=[],
         )
     if isinstance(inst.value, Constructor):
-        return Operation(
+        return EgirOperation(
             type="return",
             inputs=[],
             outputs=[],
             params={"type": inst.value.type_name, "fields": inst.value.fields},
         )
-    return Operation(type="return", inputs=[], outputs=[])
+    return EgirOperation(type="return", inputs=[], outputs=[])

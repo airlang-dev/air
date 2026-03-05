@@ -34,8 +34,8 @@ try:
     pprint.pp(program, width=120, compact=True)
 
     from cfg_builder import build_cfg
-    from egir_builder import build_egir
-    from egir_serializer import write_egir_json
+    from egir.builder import build_egir
+    from egir.serializer import write_egir_json
 
     for wf in program.workflows:
         cfg = build_cfg(wf)

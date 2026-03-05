@@ -3,9 +3,13 @@
   "title": "EGIR Workflow",
   "description": "AIR Execution Graph Intermediate Representation v0.1.0",
   "type": "object",
-  "required": ["workflow", "entry", "nodes"],
+  "required": ["egir_version", "workflow", "entry", "nodes"],
   "additionalProperties": false,
   "properties": {
+    "egir_version": {
+      "type": "string",
+      "description": "EGIR format version"
+    },
     "workflow": {
       "type": "string",
       "description": "Workflow name"

@@ -1,9 +1,11 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+EGIR_VERSION = "0.1"
+
 
 @dataclass
-class Operation:
+class EgirOperation:
     type: str
     inputs: List[str] = field(default_factory=list)
     outputs: List[str] = field(default_factory=list)
@@ -11,30 +13,30 @@ class Operation:
 
 
 @dataclass
-class ExecEdge:
+class EgirEdge:
     target: str
     condition: Optional[str] = None
 
 
 @dataclass
-class ExecNode:
+class EgirNode:
     name: str
-    operations: List[Operation] = field(default_factory=list)
+    operations: List[EgirOperation] = field(default_factory=list)
     route_variable: Optional[str] = None
-    edges: List[ExecEdge] = field(default_factory=list)
+    edges: List[EgirEdge] = field(default_factory=list)
     terminal: bool = False
 
 
 @dataclass
-class EGIRWorkflow:
+class EgirWorkflow:
     name: str
     entry: str
-    nodes: List[ExecNode] = field(default_factory=list)
+    nodes: List[EgirNode] = field(default_factory=list)
 
     def __repr__(self):
-        lines = [f"EGIRWorkflow({self.name!r}, entry={self.entry!r})\n"]
+        lines = [f"EgirWorkflow({self.name!r}, entry={self.entry!r})\n"]
         for node in self.nodes:
-            lines.append(f"ExecNode({node.name!r})")
+            lines.append(f"EgirNode({node.name!r})")
             for op in node.operations:
                 attrs = f"  {op.params}" if op.params else ""
                 lines.append(f"  {op.type}: {op.inputs} -> {op.outputs}{attrs}")

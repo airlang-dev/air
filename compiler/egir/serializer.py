@@ -3,7 +3,11 @@ import os
 
 import jsonschema
 
-_SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "..", "spec", "egir.schema.json")
+from egir.schema import EGIR_VERSION
+
+_SCHEMA_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "..", "spec", "egir.schema.json"
+)
 
 
 def serialize_operation(op):
@@ -30,8 +34,9 @@ def serialize_node(node):
     return result
 
 
-def serialize_workflow(workflow):
+def serialize_egir(workflow) -> dict:
     return {
+        "egir_version": EGIR_VERSION,
         "workflow": workflow.name,
         "entry": workflow.entry,
         "nodes": {n.name: serialize_node(n) for n in workflow.nodes},
@@ -55,7 +60,7 @@ def validate_egir(data):
 
 
 def write_egir_json(workflow, output_file):
-    data = serialize_workflow(workflow)
+    data = serialize_egir(workflow)
     validate_egir(data)
 
     with open(output_file, "w") as f:
