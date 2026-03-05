@@ -279,3 +279,11 @@ class LangGraphBackend(Backend):
             w.line()
 
         w.line("graph = builder.compile()")
+        w.line()
+        w.line()
+        w.line('if __name__ == "__main__":')
+        w.indent()
+        w.line('print("[LangGraph] executing workflow")')
+        w.line('state = graph.invoke({})')
+        w.line('print("[LangGraph] result:", state["__result__"])')
+        w.dedent()
