@@ -50,6 +50,9 @@ class LangGraphBackend(Backend):
                 for o in op.get("outputs", []):
                     all_vars.add(o["name"] if isinstance(o, dict) else o)
 
+        w.line("operation_counter = 0")
+        w.line()
+        w.line()
         # Emit node functions
         for name, node in nodes.items():
             self._emit_node_function(w, name, node, all_vars)
@@ -64,7 +67,7 @@ class LangGraphBackend(Backend):
                 w.line()
 
         # Build graph
-        self._emit_graph(w, entry, nodes)
+        self._emit_graph(w, entry, nodes, workflow)
 
         code = w.text()
 
@@ -99,8 +102,11 @@ class LangGraphBackend(Backend):
             w.dedent()
             return
 
+        w.line("global operation_counter")
+        w.line(f'print("[TRACE] node.enter node={name}")')
         for op in ops:
             self._emit_operation(w, op, all_vars)
+            w.line("operation_counter += 1")
 
         w.line("return state")
         w.dedent()
@@ -124,59 +130,79 @@ class LangGraphBackend(Backend):
 
         if op_type == "llm":
             prompt = params["prompt"]
+            w.line(f'print("[TRACE] op.start type=llm prompt={prompt}")')
             w.line(f'state["{out}"] = llm_adapter("{prompt}")')
+            w.line(f'print(f\'[TRACE] op.end output={out} value="{{state["{out}"]}}"\')')
 
         elif op_type == "transform":
             inp = inputs[0]
             via = params.get("via", "transform")
+            w.line(f'print("[TRACE] op.start type=transform via={via}")')
             w.line(f'state["{out}"] = transform_adapter(state["{inp}"], "{via}")')
+            w.line(f'print(f\'[TRACE] op.end output={out} value="{{state["{out}"]}}"\')')
 
         elif op_type == "verify":
             inp = inputs[0]
             rule = params["rule"]
+            w.line(f'print("[TRACE] op.start type=verify rule={rule}")')
             w.line(f'state["{out}"] = verify_adapter(state["{inp}"], "{rule}")')
+            w.line(f'print(f\'[TRACE] op.end output={out} value="{{state["{out}"]}}"\')')
 
         elif op_type == "aggregate":
             inputs_str = ", ".join(f'state["{i}"]' for i in inputs)
             strategy = params["strategy"]
+            w.line(f'print("[TRACE] op.start type=aggregate strategy={strategy}")')
             w.line(f'state["{out}"] = aggregate_adapter([{inputs_str}], "{strategy}")')
+            w.line(f'print(f\'[TRACE] op.end output={out} value="{{state["{out}"]}}"\')')
 
         elif op_type == "gate":
             inp = inputs[0]
+            w.line(f'print("[TRACE] op.start type=gate input={inp}")')
             w.line(f'state["{out}"] = gate_adapter(state["{inp}"])')
+            w.line(f'print(f\'[TRACE] op.end output={out} value="{{state["{out}"]}}"\')')
 
         elif op_type == "decide":
             inp = f'state["{inputs[0]}"]' if inputs else "None"
             provider = params["provider"]
+            w.line(f'print("[TRACE] op.start type=decide provider={provider}")')
             if len(out_names) >= 2:
                 w.line(
                     f'state["{out_names[0]}"], state["{out_names[1]}"] = '
                     f'decision_adapter("{provider}", {inp})'
                 )
+                w.line(f'print(f\'[TRACE] op.end output={out_names[0]} value="{{state["{out_names[0]}"]}}"\')')
+                w.line(f'print(f\'[TRACE] op.end output={out_names[1]} value="{{state["{out_names[1]}"]}}"\')')
             elif out_names:
                 w.line(
                     f'_, state["{out}"] = decision_adapter("{provider}", {inp})'
                 )
+                w.line(f'print(f\'[TRACE] op.end output={out} value="{{state["{out}"]}}"\')')
 
         elif op_type == "return":
             ret_type = params.get("type", "Artifact")
             fields = params.get("fields", {})
             fields_str = self._resolve_fields(fields, all_vars)
+            w.line(f'print("[TRACE] op.start type=return return_type={ret_type}")')
             w.line(
                 f'state["__result__"] = {{"type": "{ret_type}", "fields": {{{fields_str}}}}}'
             )
+            w.line(f'print("[TRACE] return type={ret_type}")')
 
         elif op_type == "tool":
             tool_name = params["name"]
+            w.line(f'print("[TRACE] op.start type=tool name={tool_name}")')
             w.line(f'state["{out}"] = "[TOOL:{tool_name}]"')
+            w.line(f'print(f\'[TRACE] op.end output={out} value="{{state["{out}"]}}"\')')
 
         elif op_type == "construct":
             con_type = params.get("type", "Unknown")
             fields = params.get("fields", {})
             fields_str = self._resolve_fields(fields, all_vars)
+            w.line(f'print("[TRACE] op.start type=construct construct_type={con_type}")')
             w.line(
                 f'state["{out}"] = {{"type": "{con_type}", "fields": {{{fields_str}}}}}'
             )
+            w.line(f'print(f\'[TRACE] op.end output={out} value="{{state["{out}"]}}"\')')
 
     def _classify_edges(self, edges):
         """Classify edges and assign routing keys. Returns list of (key, edge) pairs."""
@@ -213,29 +239,35 @@ class LangGraphBackend(Backend):
                 if key == "__is_list__":
                     w.line("if isinstance(val, list):")
                     w.indent()
+                    w.line(f'print(f\'[TRACE] route variable={route_var} value={{val}} -> __is_list__\')')
                     w.line('return "__is_list__"')
                     w.dedent()
                 elif key == "__not_list__":
                     w.line("if not isinstance(val, list):")
                     w.indent()
+                    w.line(f'print(f\'[TRACE] route variable={route_var} value={{val}} -> __not_list__\')')
                     w.line('return "__not_list__"')
                     w.dedent()
-            # After type checks, fall through to enum or continue
             if has_enum:
+                w.line(f'print(f\'[TRACE] route variable={route_var} value={{val}} -> {{val}}\')')
                 w.line("return val")
             elif has_continue:
+                w.line(f'print(f\'[TRACE] route variable={route_var} value={{val}} -> __continue__\')')
                 w.line('return "__continue__"')
             else:
+                w.line(f'print(f\'[TRACE] route variable={route_var} value={{val}} -> __not_list__\')')
                 w.line('return "__not_list__"')
         else:
             if has_enum:
+                w.line(f'print(f\'[TRACE] route variable={route_var} value={{val}} -> {{val}}\')')
                 w.line("return val")
             elif has_continue:
+                w.line(f'print(f\'[TRACE] route variable={route_var} value={{val}} -> __continue__\')')
                 w.line('return "__continue__"')
 
         w.dedent()
 
-    def _emit_graph(self, w: _CodeWriter, entry: str, nodes: dict):
+    def _emit_graph(self, w: _CodeWriter, entry: str, nodes: dict, workflow: str):
         w.line("builder = StateGraph(dict)")
         w.line()
 
@@ -283,7 +315,8 @@ class LangGraphBackend(Backend):
         w.line()
         w.line('if __name__ == "__main__":')
         w.indent()
-        w.line('print("[LangGraph] executing workflow")')
+        w.line(f'print("[TRACE] workflow.start workflow={workflow}")')
         w.line('state = graph.invoke({})')
+        w.line('print(f"[TRACE] workflow.end ops={operation_counter}")')
         w.line('print("[LangGraph] result:", state["__result__"])')
         w.dedent()
