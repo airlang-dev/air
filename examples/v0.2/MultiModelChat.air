@@ -1,0 +1,20 @@
+@air 0.2
+
+workflow MultiModelChat(task: Message) -> Artifact | Fault:
+
+    node discuss(history) [max=10]:
+        r1 = llm(claude, history)
+        r2 = llm(gpt, [history, r1])
+        r3 = llm(gemini, [history, r1, r2])
+
+        updated = [history, r1, r2, r3]
+        done = transform(updated) as bool via llm(check_done)
+
+        route done:
+            true: publish(updated)
+            false: discuss(updated)
+
+    node publish(history):
+        summary = llm(summarize_discussion, history)
+        return Artifact(summary=summary, transcript=history)
+

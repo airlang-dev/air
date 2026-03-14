@@ -1,0 +1,40 @@
+@air 0.2
+
+workflow FactCheckedPublish(content: Message) -> Artifact | Fault:
+
+    node analyze [max=3]:
+        summary = llm(summarize, content)
+        claims = transform(summary) as Claim[] via llm(extract_claims)
+
+        route claims:
+            Fault: analyze
+            else: validate(claims, summary)
+
+    node validate(claims, summary):
+        parallel:
+            v1 = verify(claims, product_existence)
+            v2 = verify(claims, link_validation)
+            v3 = verify(claims, compute_claim)
+
+        outcome = gate(aggregate([v1, v2, v3], majority))
+
+        route outcome:
+            PROCEED: publish(summary, outcome)
+            ESCALATE: review(summary)
+            RETRY: analyze
+            HALT: abort
+
+    node review(summary):
+        msg, outcome = decide(human_reviewer, summary)
+
+        route outcome:
+            PROCEED: publish(summary, outcome)
+            ESCALATE: abort
+            RETRY: analyze
+            HALT: abort
+
+    node publish(summary, outcome):
+        return Artifact(status="verified", summary=summary, verification=outcome)
+
+    node abort:
+        return Fault(reason="Verification failed")
