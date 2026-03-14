@@ -1,0 +1,6 @@
+@air 0.2
+
+workflow W -> Artifact:
+    node start:
+        updated = [history, r1, r2, r3]
+        return Artifact(data=updated)

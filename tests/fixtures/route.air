@@ -1,0 +1,52 @@
+@air 0.2
+
+workflow W -> Artifact | Fault:
+    node outcome_route:
+        outcome = gate(verdict)
+
+        route outcome:
+            PROCEED: publish
+            ESCALATE: abort
+            RETRY: outcome_route
+            HALT: abort
+
+    node else_route:
+        claims = transform(x) as Claim[] via llm(extract)
+
+        route claims:
+            Fault: outcome_route
+            else: publish
+
+    node bool_route:
+        done = transform(x) as bool via llm(check)
+
+        route done:
+            true: publish
+            false: outcome_route
+
+    node dotted_route:
+        result = session(members, protocol, history)
+
+        route result.consensus:
+            PROCEED: publish
+            HALT: abort
+
+    node args_route:
+        outcome = gate(verdict)
+
+        route outcome:
+            PROCEED: publish(summary, outcome)
+            HALT: abort
+
+    node inline_return_route:
+        msg, outcome = decide(reviewer, data)
+
+        route outcome:
+            PROCEED: publish
+            HALT: return Fault(reason="rejected")
+
+    node publish(summary, outcome):
+        return Artifact(status="ok")
+
+    node abort:
+        return Fault(reason="failed")

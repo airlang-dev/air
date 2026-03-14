@@ -1,14 +1,17 @@
 // =============================
 // AIR Grammar v0.2
 // =============================
+//
+// Indentation-aware grammar. Requires AirIndenter postlex.
+// See compiler/air_parser.py for parser creation.
 
-start: air_program
+start: _NL? air_program _NL?
 
 // -----------------------------
 // PROGRAM
 // -----------------------------
 
-air_program: version_decl workflow_decl+
+air_program: version_decl _NL workflow_decl (_NL workflow_decl)*
 
 version_decl: "@air" VERSION mode_decl?
 
@@ -18,7 +21,7 @@ mode_decl: "[" "mode" "=" IDENTIFIER "]"
 // WORKFLOW
 // -----------------------------
 
-workflow_decl: "workflow" IDENTIFIER workflow_params? "->" return_type ":" node_decl+
+workflow_decl: "workflow" IDENTIFIER workflow_params? "->" return_type ":" _NL _INDENT (node_decl _NL?)+ _DEDENT
 
 workflow_params: "(" param_list ")"
 
@@ -32,7 +35,7 @@ return_type: type_name ("|" type_name)*
 // NODES
 // -----------------------------
 
-node_decl: "node" IDENTIFIER node_params? node_modifiers? ":" node_body
+node_decl: "node" IDENTIFIER node_params? node_modifiers? ":" _NL _INDENT (statement _NL?)+ _DEDENT
 
 node_params: "(" identifier_list ")"
 
@@ -41,8 +44,6 @@ node_modifiers: "[" node_modifier ("," node_modifier)* "]"
 node_modifier: "max" "=" NUMBER     -> max_modifier
              | "fallback"           -> fallback_modifier
              | "partial"            -> partial_modifier
-
-node_body: statement+
 
 // -----------------------------
 // STATEMENTS
@@ -82,9 +83,12 @@ expression: llm_call
 
 // bare_expression handles node calls (unconditional transitions)
 // and standalone instruction calls without assignment.
-// Instruction keywords (tool, llm, session) match node_call at the
-// grammar level; the AST builder disambiguates by name.
-bare_expression: node_call
+// Instruction keywords need explicit alternatives because Lark's
+// named terminals (TOOL, LLM, SESSION) take priority over IDENTIFIER.
+bare_expression: tool_call
+              | llm_call
+              | session_call
+              | node_call
 
 // -----------------------------
 // LLM
@@ -138,7 +142,7 @@ transform_expr: "transform" "(" arg ")" "as" type_name ("via" llm_call)?
 // ROUTE
 // -----------------------------
 
-route_stmt: "route" route_value ":" route_case+
+route_stmt: "route" route_value ":" _NL _INDENT (route_case _NL?)+ _DEDENT
 
 route_value: dotted_name
            | IDENTIFIER
@@ -160,11 +164,9 @@ pattern: "else"          -> else_pattern
 // PARALLEL
 // -----------------------------
 
-parallel_block: "parallel" parallel_modifier? ":" parallel_body
+parallel_block: "parallel" parallel_modifier? ":" _NL _INDENT (statement _NL?)+ _DEDENT
 
 parallel_modifier: "[" "partial" "]"
-
-parallel_body: statement+
 
 // -----------------------------
 // RETURN
@@ -229,9 +231,12 @@ STRING: /"[^"]*"/
 // WHITESPACE & COMMENTS
 // -----------------------------
 
-%import common.WS_INLINE
-%declare _INDENT _DEDENT _NL
+// _NL matches newlines, absorbing blank lines and comment-only lines.
+// The Indenter uses the whitespace after the last newline for indentation.
+_NL: /(\r?\n[\t ]*(\/\/[^\n]*)?)+/
 
+%declare _INDENT _DEDENT
+
+%import common.WS_INLINE
 %ignore WS_INLINE
 %ignore /\/\/[^\n]*/
-%ignore /\n\s*/

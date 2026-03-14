@@ -1,0 +1,5 @@
+@air 0.2 [mode=strict]
+
+workflow W -> Artifact:
+    node start:
+        return Artifact(status="ok")

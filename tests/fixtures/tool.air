@@ -1,0 +1,10 @@
+@air 0.2
+
+workflow W -> Artifact | Fault:
+    node assigned:
+        docs = tool(fetch_docs, product_id)
+        return Artifact(data=docs)
+
+    node bare:
+        tool(notify_ops, Fault.reason)
+        return Fault(reason="failed")

@@ -1,0 +1,5 @@
+@air 0.2
+
+workflow DailyReport -> Artifact:
+    node start:
+        return Artifact(status="ok")

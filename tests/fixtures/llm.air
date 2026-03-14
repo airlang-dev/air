@@ -1,0 +1,10 @@
+@air 0.2
+
+workflow W -> Artifact:
+    node two_args:
+        result = llm(summarize, content)
+        return Artifact(summary=result)
+
+    node list_arg:
+        r = llm(gpt, [history, r1])
+        return Artifact(data=r)

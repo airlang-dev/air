@@ -1,0 +1,14 @@
+@air 0.2
+
+workflow W(members: Participants, protocol: Protocol) -> Artifact:
+    node decide_node:
+        msg, outcome = decide(human_reviewer, summary)
+        return Artifact(status="ok")
+
+    node decide_discard:
+        _, outcome = decide(risk_policy, claims)
+        return Artifact(status="ok")
+
+    node session_node:
+        result = session(members, protocol, history)
+        return Artifact(data=result)

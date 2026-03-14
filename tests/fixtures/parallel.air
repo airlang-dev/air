@@ -1,0 +1,14 @@
+@air 0.2
+
+workflow W -> Artifact | Fault:
+    node strict:
+        parallel:
+            v1 = verify(claims, rule1)
+            v2 = verify(claims, rule2)
+        return Artifact(status="ok")
+
+    node partial_node:
+        parallel [partial]:
+            docs = tool(fetch_docs, id)
+            refs = tool(fetch_refs, id)
+        return Artifact(status="ok")

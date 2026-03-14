@@ -1,0 +1,10 @@
+@air 0.2
+
+workflow W -> Artifact:
+    node with_via:
+        claims = transform(summary) as Claim[] via llm(extract_claims)
+        return Artifact(data=claims)
+
+    node without_via:
+        nums = transform(text) as Number[]
+        return Artifact(data=nums)

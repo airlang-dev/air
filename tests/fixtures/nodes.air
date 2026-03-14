@@ -1,0 +1,17 @@
+@air 0.2
+
+workflow W -> Artifact | Fault:
+    node start:
+        return Artifact(status="ok")
+
+    node publish(summary, outcome):
+        return Artifact(status="ok")
+
+    node retry [max=5]:
+        return Artifact(status="ok")
+
+    node discuss(history) [max=10]:
+        return Artifact(status="ok")
+
+    node recovery [fallback]:
+        return Fault(reason="failed")

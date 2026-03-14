@@ -1,5 +1,6 @@
-from dataclasses import dataclass
-from typing import List, Optional, Dict, Any
+from dataclasses import dataclass, field
+from typing import Optional, Union
+
 
 # -----------------------------
 # Types
@@ -13,27 +14,71 @@ class Type:
 
 
 # -----------------------------
+# Values (used in args, fields)
+# -----------------------------
+
+
+@dataclass
+class Identifier:
+    """A bare name: summary, claims, Fault."""
+    name: str
+
+
+@dataclass
+class DottedName:
+    """A dotted access: result.consensus, Fault.reason."""
+    object: str
+    attribute: str
+
+
+@dataclass
+class ListLiteral:
+    """A list expression: [history, r1, r2]."""
+    items: list["Arg"]
+
+
+# An argument in a function call or list
+Arg = Union[Identifier, DottedName, ListLiteral]
+
+
+# A value in a constructor field
+Value = Union[Identifier, DottedName, str, ListLiteral]
+
+
+# -----------------------------
 # Core Program
 # -----------------------------
 
 
 @dataclass
+class Param:
+    """Workflow input parameter: name: Type."""
+    name: str
+    type: Type
+
+
+@dataclass
 class Program:
-    workflows: List["Workflow"]
+    version: str
+    mode: Optional[str]
+    workflows: list["Workflow"]
 
 
 @dataclass
 class Workflow:
     name: str
-    return_types: List[Type]
-    blocks: List["Block"]
-    fault_handler: Optional["Block"]
+    params: list[Param]
+    return_types: list[Type]
+    nodes: list["Node"]
 
 
 @dataclass
-class Block:
-    label: str
-    instructions: List["Instruction"]
+class Node:
+    name: str
+    params: list[str] = field(default_factory=list)
+    max_visits: Optional[int] = None
+    is_fallback: bool = False
+    body: list["Instruction"] = field(default_factory=list)
 
 
 # -----------------------------
@@ -47,41 +92,38 @@ class Instruction:
 
 @dataclass
 class Assign(Instruction):
-    targets: List[str]
+    targets: list[str]
     value: "Expression"
 
 
 @dataclass
 class Route(Instruction):
-    value: str
-    cases: List["RouteCase"]
+    value: Arg
+    cases: list["RouteCase"]
+
+
+@dataclass
+class NodeCall(Instruction):
+    """Unconditional transition: validate(claims, summary)."""
+    name: str
+    args: list[Arg] = field(default_factory=list)
 
 
 @dataclass
 class RouteCase:
     pattern: "Pattern"
-    target: str
+    target: Union[NodeCall, "Return", str]
 
 
 @dataclass
 class Parallel(Instruction):
-    branches: List[Instruction]
-
-
-@dataclass
-class Loop(Instruction):
-    name: str
-    max_iterations: int
-    body: List[Instruction]
+    branches: list[Instruction]
+    partial: bool = False
 
 
 @dataclass
 class Return(Instruction):
     value: "Expression"
-
-
-class Continue(Instruction):
-    pass
 
 
 class Unreachable(Instruction):
@@ -102,19 +144,19 @@ class EnumPattern(Pattern):
     value: str
 
 
-class TypePattern:
-    def __init__(self, name, is_list=False):
-        self.name = name
-        self.is_list = is_list
-
-    def __repr__(self):
-        if self.is_list:
-            return f"TypePattern(name='{self.name}', is_list=True)"
-        return f"TypePattern(name='{self.name}', is_list=False)"
+@dataclass
+class TypePattern(Pattern):
+    name: str
+    is_list: bool = False
 
 
-class DefaultPattern(Pattern):
+class ElsePattern(Pattern):
     pass
+
+
+@dataclass
+class BoolPattern(Pattern):
+    value: bool
 
 
 # -----------------------------
@@ -127,52 +169,53 @@ class Expression:
 
 
 @dataclass
-class Variable(Expression):
-    name: str
-
-
-@dataclass
 class LLMCall(Expression):
     prompt: str
+    args: list[Arg] = field(default_factory=list)
 
 
 @dataclass
 class ToolCall(Expression):
     name: str
-    args: List[str]
+    args: list[Arg] = field(default_factory=list)
 
 
 @dataclass
 class Transform(Expression):
-    input: str
+    input: Arg
     target_type: Type
-    via: Optional[LLMCall]
+    via: Optional[LLMCall] = None
 
 
 @dataclass
 class Verify(Expression):
-    input: str
-    rule: str
+    input: Arg
+    rule: Arg
 
 
 @dataclass
 class Aggregate(Expression):
-    inputs: List[str]
+    inputs: list[Arg]
     strategy: str
 
 
 @dataclass
 class Gate(Expression):
-    input: str
+    input: "Expression"
 
 
 @dataclass
 class Decide(Expression):
     provider: str
-    input: Optional[str]
+    args: list[Arg] = field(default_factory=list)
+
+
+@dataclass
+class Session(Expression):
+    args: list[Arg] = field(default_factory=list)
 
 
 @dataclass
 class Constructor(Expression):
     type_name: str
-    fields: Dict[str, Any]
+    fields: dict[str, Value]
