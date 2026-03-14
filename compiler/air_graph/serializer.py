@@ -6,7 +6,7 @@ import jsonschema
 from air_graph.schema import AIR_GRAPH_VERSION
 
 _SCHEMA_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "spec", "air_graph.schema.json"
+    os.path.dirname(__file__), "..", "..", "spec", f"v{AIR_GRAPH_VERSION}", "air_graph.schema.json"
 )
 
 

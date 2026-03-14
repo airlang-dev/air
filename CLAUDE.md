@@ -11,16 +11,18 @@
 ```
 air/
 ├── spec/
-│   ├── 01_air_language_spec_v0_1_0.md     # Language spec v0.1
-│   ├── 01_air_language_spec_v0_2_0.md     # Language spec v0.2 (latest)
-│   ├── 02_air_ast_spec_v0_1_0.md          # AST node definitions
-│   ├── 03_air_cfg_spec_v0_1_0.md          # CFG construction spec
-│   ├── 04_air_graph_spec_v0_1_0.md        # AIR Graph spec
-│   ├── 05_air_graph_json_schema_v0_1_0.md # JSON schema for .airc artifacts
-│   ├── 06_agent_vm_spec_v0_1_0.md         # Agent VM spec
-│   ├── air.ebnf                           # Formal EBNF grammar
-│   ├── air.lark                           # Lark parser grammar (executable)
-│   └── air_graph.schema.json             # JSON schema definition
+│   ├── v0.1/                              # Frozen reference
+│   │   ├── 01_air_language_spec.md
+│   │   ├── 02_air_ast_spec.md
+│   │   ├── 03_air_cfg_spec.md
+│   │   ├── 04_air_graph_spec.md
+│   │   ├── 05_air_graph_json_schema_spec.md
+│   │   ├── 06_agent_vm_spec.md
+│   │   ├── air.ebnf
+│   │   ├── air.lark
+│   │   └── air_graph.schema.json
+│   └── v0.2/                              # Active development
+│       └── 01_air_language_spec.md
 ├── compiler/
 │   ├── cli.py                             # CLI entry point (`air compile`, `air backend`)
 │   ├── validate_air.py                    # Dev tool — parse + validate + print AST
@@ -84,7 +86,7 @@ python runtime/run_workflow.py build/aurora_fact_check.airc
 ```
 AIR source (.air)
       |
-  Lark parser (spec/air.lark)
+  Lark parser (spec/v{VERSION}/air.lark)
       |
   Parse tree
       |
@@ -200,12 +202,12 @@ The LangGraph backend generates a self-contained Python file with:
 
 ## Key Files to Read First
 
-1. [spec/01_air_language_spec_v0_2_0.md](spec/01_air_language_spec_v0_2_0.md) -- latest language semantics
+1. [spec/v0.2/01_air_language_spec.md](spec/v0.2/01_air_language_spec.md) -- latest language semantics
 2. [examples/v0.1/example_1.air](examples/v0.1/example_1.air) -- v0.1 reference workflow
-2b. [examples/v0.2/](examples/v0.2/) -- v0.2 example workflows
-3. [compiler/cli.py](compiler/cli.py) -- CLI entry point
-4. [compiler/air_ast.py](compiler/air_ast.py) -- AST node structure
-5. [backends/langgraph/backend.py](backends/langgraph/backend.py) -- code generation
+3. [examples/v0.2/](examples/v0.2/) -- v0.2 example workflows
+4. [compiler/cli.py](compiler/cli.py) -- CLI entry point
+5. [compiler/air_ast.py](compiler/air_ast.py) -- AST node structure
+6. [backends/langgraph/backend.py](backends/langgraph/backend.py) -- code generation
 
 ## Dependencies
 

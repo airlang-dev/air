@@ -11,7 +11,9 @@ if len(sys.argv) < 2:
 
 input_file = sys.argv[1]
 
-with open("spec/air.lark") as f:
+AIR_LANG_VERSION = "0.1"
+
+with open(os.path.join("spec", f"v{AIR_LANG_VERSION}", "air.lark")) as f:
     grammar = f.read()
 
 parser = Lark(grammar, start="start")

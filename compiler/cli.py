@@ -4,6 +4,8 @@ import sys
 
 from lark import Lark, UnexpectedInput
 
+AIR_LANG_VERSION = "0.1"
+
 
 def main():
     parser = argparse.ArgumentParser(prog="air", description="AIR compiler")
@@ -32,7 +34,7 @@ def main():
 def compile_air(input_file, output_path):
     # Resolve paths relative to project root
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    grammar_path = os.path.join(project_root, "spec", "air.lark")
+    grammar_path = os.path.join(project_root, "spec", f"v{AIR_LANG_VERSION}", "air.lark")
 
     with open(grammar_path) as f:
         grammar = f.read()
