@@ -1,0 +1,237 @@
+// =============================
+// AIR Grammar v0.2
+// =============================
+
+start: air_program
+
+// -----------------------------
+// PROGRAM
+// -----------------------------
+
+air_program: version_decl workflow_decl+
+
+version_decl: "@air" VERSION mode_decl?
+
+mode_decl: "[" "mode" "=" IDENTIFIER "]"
+
+// -----------------------------
+// WORKFLOW
+// -----------------------------
+
+workflow_decl: "workflow" IDENTIFIER workflow_params? "->" return_type ":" node_decl+
+
+workflow_params: "(" param_list ")"
+
+param_list: param ("," param)*
+
+param: IDENTIFIER ":" type_name
+
+return_type: type_name ("|" type_name)*
+
+// -----------------------------
+// NODES
+// -----------------------------
+
+node_decl: "node" IDENTIFIER node_params? node_modifiers? ":" node_body
+
+node_params: "(" identifier_list ")"
+
+node_modifiers: "[" node_modifier ("," node_modifier)* "]"
+
+node_modifier: "max" "=" NUMBER     -> max_modifier
+             | "fallback"           -> fallback_modifier
+             | "partial"            -> partial_modifier
+
+node_body: statement+
+
+// -----------------------------
+// STATEMENTS
+// -----------------------------
+
+statement: assignment
+         | bare_expression
+         | route_stmt
+         | parallel_block
+         | return_stmt
+         | unreachable_stmt
+
+// -----------------------------
+// ASSIGNMENT
+// -----------------------------
+
+assignment: lvalue "=" expression
+
+lvalue: IDENTIFIER ("," IDENTIFIER)*
+
+// -----------------------------
+// EXPRESSIONS
+// -----------------------------
+
+expression: llm_call
+          | tool_call
+          | verify_call
+          | aggregate_call
+          | gate_call
+          | decide_call
+          | session_call
+          | transform_expr
+          | constructor
+          | list_literal
+          | dotted_name
+          | IDENTIFIER
+
+// bare_expression handles node calls (unconditional transitions)
+// and standalone instruction calls without assignment.
+// Instruction keywords (tool, llm, session) match node_call at the
+// grammar level; the AST builder disambiguates by name.
+bare_expression: node_call
+
+// -----------------------------
+// LLM
+// -----------------------------
+
+llm_call: "llm" "(" arg_list ")"
+
+// -----------------------------
+// TOOL
+// -----------------------------
+
+tool_call: "tool" "(" arg_list ")"
+
+// -----------------------------
+// VERIFY
+// -----------------------------
+
+verify_call: "verify" "(" arg "," arg ")"
+
+// -----------------------------
+// AGGREGATE
+// -----------------------------
+
+aggregate_call: "aggregate" "(" list_literal "," IDENTIFIER ")"
+
+// -----------------------------
+// GATE
+// -----------------------------
+
+gate_call: "gate" "(" expression ")"
+
+// -----------------------------
+// DECIDE
+// -----------------------------
+
+decide_call: "decide" "(" arg_list ")"
+
+// -----------------------------
+// SESSION
+// -----------------------------
+
+session_call: "session" "(" arg_list ")"
+
+// -----------------------------
+// TRANSFORM
+// -----------------------------
+
+transform_expr: "transform" "(" arg ")" "as" type_name ("via" llm_call)?
+
+// -----------------------------
+// ROUTE
+// -----------------------------
+
+route_stmt: "route" route_value ":" route_case+
+
+route_value: dotted_name
+           | IDENTIFIER
+
+route_case: pattern ":" route_target
+
+route_target: return_stmt
+            | node_call
+            | IDENTIFIER
+
+node_call: IDENTIFIER "(" arg_list? ")"
+
+pattern: "else"          -> else_pattern
+       | "true"          -> true_pattern
+       | "false"         -> false_pattern
+       | IDENTIFIER      -> name_pattern
+
+// -----------------------------
+// PARALLEL
+// -----------------------------
+
+parallel_block: "parallel" parallel_modifier? ":" parallel_body
+
+parallel_modifier: "[" "partial" "]"
+
+parallel_body: statement+
+
+// -----------------------------
+// RETURN
+// -----------------------------
+
+return_stmt: "return" constructor
+
+constructor: type_name "(" field_list? ")"
+
+field_list: field ("," field)*
+
+field: IDENTIFIER "=" value
+
+value: dotted_name
+     | IDENTIFIER
+     | STRING
+     | list_literal
+
+// -----------------------------
+// CONTROL
+// -----------------------------
+
+unreachable_stmt: "unreachable"
+
+// -----------------------------
+// SHARED
+// -----------------------------
+
+arg_list: arg ("," arg)*
+
+arg: dotted_name
+   | list_literal
+   | IDENTIFIER
+
+dotted_name: IDENTIFIER "." IDENTIFIER
+
+list_literal: "[" arg_list "]"
+
+identifier_list: IDENTIFIER ("," IDENTIFIER)*
+
+// -----------------------------
+// TYPES
+// -----------------------------
+
+type_name: IDENTIFIER array_suffix?
+
+array_suffix: "[" "]"
+
+// -----------------------------
+// TOKENS
+// -----------------------------
+
+IDENTIFIER: /[A-Za-z_][A-Za-z0-9_]*/
+
+VERSION: /[0-9]+\.[0-9]+/
+
+NUMBER: /[0-9]+/
+
+STRING: /"[^"]*"/
+
+// -----------------------------
+// WHITESPACE & COMMENTS
+// -----------------------------
+
+%import common.WS_INLINE
+%declare _INDENT _DEDENT _NL
+
+%ignore WS_INLINE
+%ignore /\/\/[^\n]*/
+%ignore /\n\s*/

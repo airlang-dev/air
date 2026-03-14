@@ -1,0 +1,98 @@
+// Kitchen sink example — exercises every v0.2 construct.
+// Used as a grammar and compiler integration test.
+
+@air 0.2 [mode=strict]
+
+workflow KitchenSink(content: Message, members: Participants, protocol: Protocol) -> Artifact | Fault:
+
+    // Entry node with bounded visits
+    node analyze [max=3]:
+        summary = llm(summarize, content)
+        claims = transform(summary) as Claim[] via llm(extract_claims)
+
+        // Route on union type with else
+        route claims:
+            Fault: analyze
+            else: validate(claims, summary)
+
+    // Node with explicit parameters
+    node validate(claims, summary):
+        // Parallel block (strict)
+        parallel:
+            v1 = verify(claims, product_existence)
+            v2 = verify(claims, link_validation)
+            v3 = verify(claims, compute_claim)
+
+        // Nested expression: gate(aggregate(...))
+        outcome = gate(aggregate([v1, v2, v3], unanimous))
+
+        route outcome:
+            PROCEED: enrich(summary, outcome)
+            ESCALATE: review(summary)
+            RETRY: analyze
+            HALT: abort
+
+    // Node with parallel [partial]
+    node enrich(summary, outcome):
+        parallel [partial]:
+            docs = tool(fetch_docs, summary)
+            refs = tool(fetch_references, summary)
+
+        route docs:
+            Fault: review(summary)
+            else: publish(summary, outcome)
+
+    // Session instruction — multi-participant interaction
+    node discuss(history) [max=10]:
+        result = session(members, protocol, history)
+
+        // Route on dotted name
+        route result.consensus:
+            PROCEED: publish(result.history, result.consensus)
+            RETRY: discuss(result.history)
+            ESCALATE: moderate(result.history)
+            HALT: abort
+
+    // Decide instruction
+    node moderate(history):
+        msg, outcome = decide(human_reviewer, history)
+
+        route outcome:
+            PROCEED: publish(history, outcome)
+            RETRY: discuss(history)
+            HALT: abort
+            ESCALATE: abort
+
+    // Human review with decide
+    node review(summary):
+        msg, outcome = decide(human_reviewer, summary)
+
+        route outcome:
+            PROCEED: publish(summary, outcome)
+            ESCALATE: abort
+            RETRY: analyze
+            HALT: abort
+
+    // Return with constructor
+    node publish(content, status):
+        result = tool(publish_article, content)
+
+        route result:
+            Fault: abort
+            else: done(content, status)
+
+    node done(content, status):
+        return Artifact(status="verified", summary=content, verification=status)
+
+    // Unconditional terminator
+    node abort:
+        return Fault(reason="Workflow failed")
+
+    // Fallback node — catches unhandled faults
+    node recovery [fallback]:
+        tool(notify_ops, Fault.reason)
+        msg, outcome = decide(incident_manager, Fault.reason)
+
+        route outcome:
+            RETRY: analyze
+            HALT: return Fault(reason=Fault.reason)
