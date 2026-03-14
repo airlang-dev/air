@@ -1,12 +1,12 @@
 @air 0.2
 
-workflow W -> Artifact:
+workflow W(claims: Claim[], consensus: Consensus, vx: Verdict, vy: Verdict, vz: Verdict) -> Artifact:
     node verify_node:
         v1 = verify(claims, product_existence)
         return Artifact(v=v1)
 
     node aggregate_node:
-        c = aggregate([v1, v2, v3], majority)
+        c = aggregate([vx, vy, vz], majority)
         return Artifact(c=c)
 
     node gate_simple:
@@ -14,5 +14,5 @@ workflow W -> Artifact:
         return Artifact(o=outcome)
 
     node gate_nested:
-        outcome = gate(aggregate([v1, v2], majority))
+        outcome = gate(aggregate([vx, vy], majority))
         return Artifact(o=outcome)

@@ -1,5 +1,5 @@
 @air 0.2
 
-workflow W -> Artifact:
+workflow W(summary: Message) -> Artifact:
     node start:
         return Artifact(status="verified", summary=summary)

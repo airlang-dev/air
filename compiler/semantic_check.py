@@ -1,191 +1,285 @@
-from lark import Tree, Token
+"""Semantic checker for AIR v0.2 AST.
+
+Validates:
+1. Node name uniqueness within a workflow
+2. Node names don't collide with instruction keywords
+3. SSA (no variable reassignment within a node)
+4. Variable existence (workflow params, node params, local assignments)
+5. Route target existence (must reference valid node names)
+6. Route exhaustiveness (Outcome routes need full coverage or else)
+7. At most one fallback node per workflow
+8. Return type validity (constructor type must be in workflow return types)
+9. Every node must terminate (return, node_call, route, or unreachable)
+"""
+
+from air_ast import (
+    Aggregate, Assign, Constructor, Decide, DottedName, ElsePattern,
+    EnumPattern, Gate, Identifier, LLMCall, ListLiteral, Node, NodeCall,
+    Parallel, Program, Return, Route, RouteCase, Session, ToolCall,
+    Transform, Unreachable, Verify, Workflow,
+)
 
 OUTCOME_VALUES = {"PROCEED", "RETRY", "ESCALATE", "HALT"}
 
+RESERVED_KEYWORDS = {
+    "llm", "tool", "transform", "verify", "aggregate",
+    "gate", "decide", "session", "route", "return",
+    "unreachable", "parallel",
+}
 
-class SemanticChecker:
 
-    def __init__(self, tree):
-        self.tree = tree
-        self.labels = set()
-        self.variables = set()
+class SemanticError(Exception):
+    pass
 
-    # --------------------------------
-    # entry point
-    # --------------------------------
 
-    def run(self):
-        self.collect_labels(self.tree)
-        self.check_nodes(self.tree)
+def check_program(program: Program):
+    """Run all semantic checks on a program."""
+    for workflow in program.workflows:
+        _check_workflow(workflow)
 
-    # --------------------------------
-    # utilities
-    # --------------------------------
 
-    def get_identifier(self, node):
-        if isinstance(node, Token):
-            return node.value
-        if isinstance(node, Tree) and node.children:
-            return self.get_identifier(node.children[0])
-        return None
+def _check_workflow(workflow: Workflow):
+    node_names = set()
+    fallback_count = 0
+    return_type_names = {t.name for t in workflow.return_types}
 
-    def is_variable(self, name):
-        return name in self.variables
+    # Workflow param names are visible to all nodes
+    workflow_params = {p.name for p in workflow.params}
 
-    # --------------------------------
-    # label collection
-    # --------------------------------
+    # 1. Node name uniqueness + keyword check
+    for node in workflow.nodes:
+        if node.name in node_names:
+            raise SemanticError(
+                f"Duplicate node name '{node.name}' in workflow '{workflow.name}'"
+            )
+        node_names.add(node.name)
 
-    def collect_labels(self, node):
+        if node.name in RESERVED_KEYWORDS:
+            raise SemanticError(
+                f"Node name '{node.name}' is a reserved keyword"
+            )
 
-        if isinstance(node, Tree):
+        if node.is_fallback:
+            fallback_count += 1
 
-            if node.data == "block_label":
-                label = self.get_identifier(node.children[0])
-                if label:
-                    self.labels.add(label)
+    # 7. At most one fallback
+    if fallback_count > 1:
+        raise SemanticError(
+            f"Multiple fallback nodes in workflow '{workflow.name}'"
+        )
 
-            for child in node.children:
-                self.collect_labels(child)
+    # Per-node checks
+    for node in workflow.nodes:
+        _check_node(node, node_names, workflow_params, return_type_names)
 
-    # --------------------------------
-    # recursive checks
-    # --------------------------------
 
-    def check_nodes(self, node):
+def _check_node(node: Node, node_names: set, workflow_params: set,
+                return_type_names: set):
+    # Variables in scope: workflow params + node params
+    defined = set(workflow_params) | set(node.params)
 
-        if isinstance(node, Tree):
+    # Walk body statements
+    for stmt in node.body:
+        _check_statement(stmt, defined, node_names, return_type_names)
 
-            if node.data == "assignment":
-                self.check_assignment(node)
+    # 9. Termination check
+    if not _terminates(node.body):
+        raise SemanticError(
+            f"Node '{node.name}' does not terminate "
+            f"(must end with return, route, node call, or unreachable)"
+        )
 
-            elif node.data == "route_stmt":
-                self.check_route(node)
 
-            elif node.data in {
-                "llm_call",
-                "verify_call",
-                "gate_call",
-                "aggregate_call",
-                "decide_call",
-                "transform_expr",
-                "tool_call",
-            }:
-                self.check_expression_inputs(node)
+def _check_statement(stmt, defined: set, node_names: set,
+                     return_type_names: set):
+    if isinstance(stmt, Assign):
+        # Check RHS references first
+        _check_expression_refs(stmt.value, defined)
+        # Then define LHS (SSA check)
+        for target in stmt.targets:
+            if target != "_":
+                if target in defined:
+                    raise SemanticError(
+                        f"SSA violation: variable '{target}' assigned twice"
+                    )
+                defined.add(target)
 
-            for child in node.children:
-                self.check_nodes(child)
+    elif isinstance(stmt, Return):
+        _check_expression_refs(stmt.value, defined)
+        # 8. Return type validity
+        if isinstance(stmt.value, Constructor):
+            if stmt.value.type_name not in return_type_names:
+                raise SemanticError(
+                    f"Return type '{stmt.value.type_name}' not declared "
+                    f"in workflow return types"
+                )
 
-    # --------------------------------
-    # SSA validation
-    # --------------------------------
+    elif isinstance(stmt, Route):
+        _check_route(stmt, defined, node_names)
 
-    def check_assignment(self, node):
+    elif isinstance(stmt, NodeCall):
+        # Check args reference defined variables
+        _check_args_refs(stmt.args, defined)
+        # 5. Target must be a known node
+        if stmt.name not in node_names:
+            raise SemanticError(
+                f"Unknown node '{stmt.name}' in node call"
+            )
 
-        lvalue = node.children[0]
+    elif isinstance(stmt, Parallel):
+        _check_parallel(stmt, defined, node_names, return_type_names)
 
-        if isinstance(lvalue, Tree):
+    elif isinstance(stmt, Unreachable):
+        pass
 
-            for child in lvalue.children:
+    # Bare instruction calls (tool, llm, session without assignment)
+    elif isinstance(stmt, (ToolCall, LLMCall, Session)):
+        _check_expression_refs(stmt, defined)
 
-                name = self.get_identifier(child)
 
-                if name and name != "_":
+def _check_parallel(parallel: Parallel, defined: set, node_names: set,
+                    return_type_names: set):
+    # Variables defined in parallel branches all merge into the outer scope.
+    # But within the parallel block, SSA still applies — no two branches
+    # can define the same variable.
+    parallel_defined = set()
+    for branch in parallel.branches:
+        branch_defined = set(defined)
+        _check_statement(branch, branch_defined, node_names, return_type_names)
+        # Collect newly defined variables
+        new_vars = branch_defined - defined
+        for var in new_vars:
+            if var in parallel_defined:
+                raise SemanticError(
+                    f"SSA violation: variable '{var}' assigned in "
+                    f"multiple parallel branches"
+                )
+            parallel_defined.add(var)
+    # Merge parallel-defined variables into outer scope
+    defined.update(parallel_defined)
 
-                    if name in self.variables:
-                        raise Exception(
-                            f"SSA violation: variable '{name}' assigned twice"
-                        )
 
-                    self.variables.add(name)
+def _check_route(route: Route, defined: set, node_names: set):
+    # Check route value is defined
+    _check_arg_ref(route.value, defined)
 
-    # --------------------------------
-    # route validation
-    # --------------------------------
+    patterns = set()
+    has_else = False
 
-    def check_route(self, node):
+    for case in route.cases:
+        # Collect patterns for exhaustiveness
+        if isinstance(case.pattern, ElsePattern):
+            has_else = True
+        elif isinstance(case.pattern, EnumPattern):
+            patterns.add(case.pattern.value)
 
-        patterns = set()
+        # Check target
+        target = case.target
+        if isinstance(target, str):
+            if target not in node_names:
+                raise SemanticError(
+                    f"Unknown node '{target}' in route target"
+                )
+        elif isinstance(target, NodeCall):
+            if target.name not in node_names:
+                raise SemanticError(
+                    f"Unknown node '{target.name}' in route target"
+                )
+            _check_args_refs(target.args, defined)
+        elif isinstance(target, Return):
+            _check_expression_refs(target.value, defined)
 
-        for child in node.children:
+    # 6. Route exhaustiveness for Outcome routes
+    if patterns.intersection(OUTCOME_VALUES):
+        if not has_else:
+            missing = OUTCOME_VALUES - patterns
+            if missing:
+                raise SemanticError(
+                    f"Incomplete outcome route: missing {missing}"
+                )
 
-            if not isinstance(child, Tree):
-                continue
 
-            if child.data != "route_case":
-                continue
+def _check_expression_refs(expr, defined: set):
+    """Check that all variable references in an expression are defined."""
+    if isinstance(expr, Identifier):
+        _check_var_ref(expr.name, defined)
+    elif isinstance(expr, DottedName):
+        _check_var_ref(expr.object, defined)
+    elif isinstance(expr, ListLiteral):
+        for item in expr.items:
+            _check_arg_ref(item, defined)
+    elif isinstance(expr, LLMCall):
+        # prompt is an asset name, not a variable — don't check it
+        for arg in expr.args:
+            _check_arg_ref(arg, defined)
+    elif isinstance(expr, ToolCall):
+        # tool name is an asset name — don't check it
+        for arg in expr.args:
+            _check_arg_ref(arg, defined)
+    elif isinstance(expr, Verify):
+        _check_arg_ref(expr.input, defined)
+        # rule is an asset name — don't check it
+    elif isinstance(expr, Aggregate):
+        for inp in expr.inputs:
+            _check_arg_ref(inp, defined)
+    elif isinstance(expr, Gate):
+        _check_expression_refs(expr.input, defined)
+    elif isinstance(expr, Decide):
+        # provider is an asset name — don't check it
+        for arg in expr.args:
+            _check_arg_ref(arg, defined)
+    elif isinstance(expr, Session):
+        for arg in expr.args:
+            _check_arg_ref(arg, defined)
+    elif isinstance(expr, Transform):
+        _check_arg_ref(expr.input, defined)
+        if expr.via:
+            _check_expression_refs(expr.via, defined)
+    elif isinstance(expr, Constructor):
+        for val in expr.fields.values():
+            if isinstance(val, Identifier):
+                _check_var_ref(val.name, defined)
+            elif isinstance(val, DottedName):
+                _check_var_ref(val.object, defined)
+            # string literals are fine
 
-            pattern_node = child.children[0]
-            target_node = child.children[1]
 
-            pattern = self.get_identifier(pattern_node)
-            target = self.get_identifier(target_node)
+def _check_arg_ref(arg, defined: set):
+    """Check a single argument reference."""
+    if isinstance(arg, Identifier):
+        _check_var_ref(arg.name, defined)
+    elif isinstance(arg, DottedName):
+        _check_var_ref(arg.object, defined)
+    elif isinstance(arg, ListLiteral):
+        for item in arg.items:
+            _check_arg_ref(item, defined)
 
-            if pattern:
-                patterns.add(pattern)
 
-            if target and target != "continue" and target not in self.labels:
-                raise Exception(f"Unknown label '{target}' in route")
+def _check_args_refs(args: list, defined: set):
+    for arg in args:
+        _check_arg_ref(arg, defined)
 
-        # check outcome coverage
-        if patterns.intersection(OUTCOME_VALUES):
 
-            if "default" not in patterns:
+def _check_var_ref(name: str, defined: set):
+    """Check that a variable name is defined, ignoring type names and assets."""
+    # Type names (used in constructors, dotted access like Fault.reason)
+    # and asset names (prompts, rules, providers) don't need to be defined
+    # as variables. We use a simple heuristic: uppercase first letter = type/asset.
+    if name[0].isupper():
+        return
+    if name == "_":
+        return
+    if name not in defined:
+        raise SemanticError(f"Undefined variable '{name}'")
 
-                missing = OUTCOME_VALUES - patterns
 
-                if missing:
-                    raise Exception(f"Incomplete outcome route: missing {missing}")
+def _terminates(body: list) -> bool:
+    """Check if a node body terminates (last statement is a terminator)."""
+    if not body:
+        return False
 
-    # --------------------------------
-    # variable existence checks
-    # --------------------------------
-
-    def require_variable(self, name):
-        if name and name not in self.variables:
-            raise Exception(f"Unknown variable '{name}'")
-
-    def check_expression_inputs(self, node):
-
-        if node.data == "verify_call":
-
-            # verify(variable, rule)
-            var = self.get_identifier(node.children[0])
-            self.require_variable(var)
-
-        elif node.data == "transform_expr":
-
-            # transform(variable, Type)
-            var = self.get_identifier(node.children[0])
-            self.require_variable(var)
-
-        elif node.data == "gate_call":
-
-            # gate(variable)
-            var = self.get_identifier(node.children[0])
-            self.require_variable(var)
-
-        elif node.data == "aggregate_call":
-
-            # aggregate([v1,v2,v3], strategy)
-            list_node = node.children[0]
-
-            for child in list_node.children:
-                var = self.get_identifier(child)
-                self.require_variable(var)
-
-        elif node.data == "decide_call":
-
-            # decide(provider, variable?)
-            if len(node.children) > 1:
-                var = self.get_identifier(node.children[1])
-                self.require_variable(var)
-
-        elif node.data == "tool_call":
-
-            # tool(name, variable...)
-            for child in node.children[1:]:
-                var = self.get_identifier(child)
-                self.require_variable(var)
-
-        # llm_call intentionally ignored
+    last = body[-1]
+    if isinstance(last, (Return, Route, NodeCall, Unreachable)):
+        return True
+    # Bare instruction calls (tool, llm, session) don't terminate
+    return False

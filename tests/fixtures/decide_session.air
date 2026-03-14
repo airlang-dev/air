@@ -1,6 +1,6 @@
 @air 0.2
 
-workflow W(members: Participants, protocol: Protocol) -> Artifact:
+workflow W(members: Participants, protocol: Protocol, summary: Message, claims: Claim[], history: Message[]) -> Artifact:
     node decide_node:
         msg, outcome = decide(human_reviewer, summary)
         return Artifact(status="ok")

@@ -1,6 +1,6 @@
 @air 0.2
 
-workflow W -> Artifact | Fault:
+workflow W(verdict: Verdict, x: Message, members: Participants, protocol: Protocol, history: Message[], summary: Message, data: Message) -> Artifact | Fault:
     node outcome_route:
         outcome = gate(verdict)
 
@@ -29,14 +29,14 @@ workflow W -> Artifact | Fault:
 
         route result.consensus:
             PROCEED: publish
-            HALT: abort
+            else: abort
 
     node args_route:
         outcome = gate(verdict)
 
         route outcome:
             PROCEED: publish(summary, outcome)
-            HALT: abort
+            else: abort
 
     node inline_return_route:
         msg, outcome = decide(reviewer, data)
@@ -44,6 +44,7 @@ workflow W -> Artifact | Fault:
         route outcome:
             PROCEED: publish
             HALT: return Fault(reason="rejected")
+            else: abort
 
     node publish(summary, outcome):
         return Artifact(status="ok")

@@ -1,6 +1,6 @@
 @air 0.2
 
-workflow W -> Artifact:
+workflow W(summary: Message, text: Message) -> Artifact:
     node with_via:
         claims = transform(summary) as Claim[] via llm(extract_claims)
         return Artifact(data=claims)

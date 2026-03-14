@@ -1,6 +1,6 @@
 @air 0.2
 
-workflow W -> Artifact | Fault:
+workflow W(product_id: Identifier) -> Artifact | Fault:
     node assigned:
         docs = tool(fetch_docs, product_id)
         return Artifact(data=docs)

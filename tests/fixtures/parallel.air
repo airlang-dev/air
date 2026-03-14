@@ -1,6 +1,6 @@
 @air 0.2
 
-workflow W -> Artifact | Fault:
+workflow W(claims: Claim[], id: Identifier) -> Artifact | Fault:
     node strict:
         parallel:
             v1 = verify(claims, rule1)

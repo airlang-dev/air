@@ -180,7 +180,7 @@ class TestGovernance:
         n = find_node(build_fixture(parser, "governance"), "aggregate_node")
         a = n.body[0].value
         assert isinstance(a, Aggregate)
-        assert a.inputs == [Identifier("v1"), Identifier("v2"), Identifier("v3")]
+        assert a.inputs == [Identifier("vx"), Identifier("vy"), Identifier("vz")]
         assert a.strategy == "majority"
 
     def test_gate_simple(self, parser):

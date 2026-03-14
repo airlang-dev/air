@@ -1,6 +1,6 @@
 @air 0.2
 
-workflow W -> Artifact:
+workflow W(content: Message, history: Message[], r1: Message) -> Artifact:
     node two_args:
         result = llm(summarize, content)
         return Artifact(summary=result)

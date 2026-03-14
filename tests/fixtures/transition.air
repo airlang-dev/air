@@ -1,6 +1,6 @@
 @air 0.2
 
-workflow W -> Artifact:
+workflow W(content: Message) -> Artifact:
     node start:
         summary = llm(summarize, content)
         publish(summary)
