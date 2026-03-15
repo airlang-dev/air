@@ -217,6 +217,19 @@ Tests use shared `.air` fixture files in `tests/fixtures/`. Fixtures are semanti
 
 pytest is configured in `pyproject.toml` with `pythonpath = ["tests", "compiler"]`.
 
+## LangGraph Backend
+
+The LangGraph backend (`backends/langgraph/backend.py`) generates self-contained Python files using LangGraph's `StateGraph`. Key design:
+
+- **`generate(air_graph)`** — pure code generation (returns string), no file I/O
+- **`compile(air_graph, output_path)`** — calls `generate()` then writes to file
+- **Dynamic imports** — only imports adapters actually used by the workflow
+- **Dotted route variables** — `result.consensus` → `state["result"]["consensus"]`
+- **Bool/else conditions** — routes on booleans use `true`/`false` keys; else uses `__else__`
+- **Mixed terminal + edges** — nodes with inline return AND route edges get conditional edges (not just END)
+- **Bare operations** — tool/llm/session without assignment produce side-effect-only code
+- **All generated code is syntactically valid Python** (verified by `compile()` in tests)
+
 ## What Is Implemented vs TODO
 
 ### Implemented
@@ -227,15 +240,13 @@ pytest is configured in `pyproject.toml` with `pythonpath = ["tests", "compiler"
 - [x] Semantic check v0.2 (SSA, variable existence, routes, fallback, return types, termination)
 - [x] CFG builder v0.2 (AST -> control flow graph)
 - [x] AIR Graph builder + serializer v0.2 (with JSON schema)
-- [x] Grammar (45) + AST (36) + semantic (48) + CFG (18) + AIR Graph (35) = 182 tests
+- [x] Grammar (45) + AST (36) + semantic (48) + CFG (18) + AIR Graph (35) + LangGraph (54) = 236 tests
 - [x] Shared test fixtures (15 .air files)
 - [x] 3 v0.2 example workflows (FactCheckedPublish, MultiModelChat, KitchenSink)
-- [x] v0.1 LangGraph backend (not yet updated for v0.2)
-- [x] v0.1 LangGraph backend code generator
+- [x] LangGraph backend v0.2 code generator
 - [x] v0.1 Reference Agent VM runtime with mock adapters
 
 ### TODO
-- [ ] LangGraph backend v0.2
 - [ ] Type system validation (type coupling rules, Section 22 of language spec)
 - [ ] Reachability / dead code analysis
 - [ ] Error messages with source locations

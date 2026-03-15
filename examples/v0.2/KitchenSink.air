@@ -96,3 +96,4 @@ workflow KitchenSink(content: Message, members: Participants, protocol: Protocol
         route outcome:
             RETRY: analyze
             HALT: return Fault(reason=Fault.reason)
+            else: abort

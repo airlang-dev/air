@@ -87,9 +87,11 @@ def _find_route_variable(instructions: list) -> str | None:
 def _convert_instructions(instructions: list, ops: list):
     for inst in instructions:
         if isinstance(inst, Assign):
-            op = _convert_assign(inst)
-            if op:
-                ops.append(op)
+            result = _convert_assign(inst)
+            if isinstance(result, list):
+                ops.extend(result)
+            elif result:
+                ops.append(result)
         elif isinstance(inst, Return):
             ops.append(_convert_return(inst))
         elif isinstance(inst, Parallel):
@@ -154,6 +156,21 @@ def _convert_assign(inst: Assign) -> AirGraphOperation | None:
             params={"strategy": expr.strategy},
         )
     if isinstance(expr, Gate):
+        if isinstance(expr.input, Aggregate):
+            # Nested gate(aggregate(...)) — emit aggregate first, then gate
+            synth_name = "__agg__"
+            agg_op = AirGraphOperation(
+                type="aggregate",
+                inputs=[_arg_to_str(a) for a in expr.input.inputs],
+                outputs=_typed_outputs([synth_name], "Consensus"),
+                params={"strategy": expr.input.strategy},
+            )
+            gate_op = AirGraphOperation(
+                type="gate",
+                inputs=[synth_name],
+                outputs=_typed_outputs(raw, "Outcome"),
+            )
+            return [agg_op, gate_op]
         return AirGraphOperation(
             type="gate",
             inputs=[_arg_to_str(expr.input)],

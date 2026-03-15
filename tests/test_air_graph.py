@@ -95,6 +95,21 @@ class TestOperations:
         ops = [op for op in node.operations if op.type == "gate"]
         assert len(ops) == 1
 
+    def test_gate_nested_aggregate(self, parser):
+        """gate(aggregate(...)) should flatten into aggregate + gate operations."""
+        graph = build_graph(parser, "governance")
+        node = next(n for n in graph.nodes if n.name == "gate_nested")
+        types = [op.type for op in node.operations]
+        assert "aggregate" in types
+        assert "gate" in types
+        agg_idx = types.index("aggregate")
+        gate_idx = types.index("gate")
+        assert agg_idx < gate_idx
+        # Gate's input should reference the aggregate's synthetic output
+        gate_op = node.operations[gate_idx]
+        agg_op = node.operations[agg_idx]
+        assert gate_op.inputs[0] == agg_op.outputs[0].name
+
     def test_decide_operation(self, parser):
         graph = build_graph(parser, "decide_session")
         node = next(n for n in graph.nodes if n.name == "decide_node")
