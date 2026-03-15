@@ -1,163 +1,53 @@
-# AIR Language Compiler
+# AIR
 
-## Project Overview
-
-**AIR** (Agentic Intermediate Representation) is a domain-specific language for describing AI agent workflows in a structured, portable, and governed manner. It acts as an IR layer between high-level orchestration intent and agent VM execution — analogous to how LLVM IR sits between source code and machine code.
-
-**Status: v0.2 compiler pipeline fully implemented — grammar through LangGraph backend and Agent VM.**
-
-## Directory Structure
+**AIR** (Agentic Intermediate Representation) is a project for describing, compiling, and executing AI agent workflows in a structured, portable, and governed manner. Write in AIR, run anywhere.
 
 ```
-air/
-├── spec/
-│   ├── v0.1/                              # Frozen reference
-│   │   ├── 01_air_language_spec.md
-│   │   ├── 02_air_ast_spec.md
-│   │   ├── 03_air_cfg_spec.md
-│   │   ├── 04_air_graph_spec.md
-│   │   ├── 05_air_graph_json_schema_spec.md
-│   │   ├── 06_agent_vm_spec.md
-│   │   ├── air.ebnf
-│   │   ├── air.lark
-│   │   └── air_graph.schema.json
-│   └── v0.2/                              # Active development
-│       ├── 01_air_language_spec.md
-│       └── air.lark
-├── compiler/
-│   ├── cli.py                             # CLI entry point (`air compile`, `air backend`)
-│   ├── validate_air.py                    # Dev tool — parse + validate + print AST
-│   ├── air_parser.py                      # Parser factory with AirIndenter postlex
-│   ├── air_ast.py                         # AST dataclass definitions (v0.2)
-│   ├── ast_builder.py                     # Lark parse tree -> AIR AST (v0.2)
-│   ├── semantic_check.py                  # Semantic validation (v0.2)
-│   ├── cfg.py                             # CFG dataclasses (v0.2)
-│   ├── cfg_builder.py                     # AST -> CFG construction (v0.2)
-│   └── air_graph/
-│       ├── schema.py                      # AIR Graph dataclasses (v0.2)
-│       ├── builder.py                     # CFG -> AIR Graph (v0.2)
-│       └── serializer.py                  # AIR Graph -> .airc JSON artifact (v0.2)
-├── backends/
-│   ├── base_backend.py                    # Backend interface
-│   └── langgraph/
-│       ├── backend.py                     # LangGraph code generator
-│       ├── cli.py                         # Standalone LangGraph CLI
-│       └── __main__.py
-├── runtime/
-│   ├── agent_vm.py                        # Reference Agent VM executor
-│   ├── adapters.py                        # Mock runtime adapters
-│   └── run_workflow.py                    # Runner: python runtime/run_workflow.py <file.airc>
-├── tests/
-│   ├── conftest.py                        # Shared pytest fixtures (parser)
-│   ├── helpers.py                         # Test helpers (load_fixture, build_fixture, find_node)
-│   ├── test_grammar.py                    # Lark grammar tests (45 tests)
-│   ├── test_ast_builder.py                # AST builder tests (36 tests)
-│   ├── test_semantic_check.py             # Semantic check tests (48 tests)
-│   ├── test_cfg_builder.py                # CFG builder tests (18 tests)
-│   ├── test_air_graph.py                  # AIR Graph builder + serializer tests (36 tests)
-│   ├── test_langgraph_backend.py          # LangGraph backend tests (54 tests)
-│   └── fixtures/                          # Shared .air test fixtures
-│       ├── basic.air                      # Minimal valid program
-│       ├── basic_strict.air               # With [mode=strict]
-│       ├── workflow_params.air            # Workflow with typed params
-│       ├── workflow_no_params.air         # Workflow without params
-│       ├── nodes.air                      # Node variants (params, max, fallback)
-│       ├── llm.air                        # LLM call variants
-│       ├── tool.air                       # Tool calls (assigned + bare)
-│       ├── transform.air                  # Transform with/without via
-│       ├── governance.air                 # Verify, aggregate, gate
-│       ├── decide_session.air             # Decide, session
-│       ├── route.air                      # All route variants
-│       ├── parallel.air                   # Parallel strict + partial
-│       ├── transition.air                 # Unconditional node call
-│       ├── return_fields.air              # Return with constructor fields
-│       └── list_assignment.air            # List literal assignment
-└── examples/
-    ├── v0.1/
-    │   ├── example_1.air                  # Aurora Fact Check (full feature demo)
-    │   ├── example_2.air                  # Loop backedge test
-    │   ├── example_3.air                  # Dead end test
-    │   ├── example_4.air                  # Unreachable block test
-    │   ├── example_5.air                  # Unknown target test
-    │   ├── example_6.air                  # Terminal node test
-    │   └── example_7.air                  # Undefined variable test
-    └── v0.2/
-        ├── FactCheckedPublish.air
-        ├── MultiModelChat.air
-        └── KitchenSink.air                # Comprehensive v0.2 feature demo
+AIR
+├── AIR Language    — the .air source language
+├── AIR Compiler    — parses and compiles .air to .airc
+├── AIR Graph       — the portable IR (.airc files)
+├── AIR Agent VM    — the reference runtime
+├── AIR Backends    — LangGraph, Agent Spec, Dify, etc.
+└── AIR Assets      — prompts, rules, schemas, providers, protocols
 ```
+
+**Status: v0.2 — AIR Language, Compiler, Graph, Agent VM, and LangGraph backend fully implemented.**
 
 ## CLI Usage
-
-The compiler is installed as the `air` command via pyproject.toml.
 
 ```bash
 source .venv/bin/activate
 
-# Compile AIR source to AIR Graph artifact (.airc)
 air compile examples/v0.2/FactCheckedPublish.air       # -> build/FactCheckedPublish.airc
 air compile examples/v0.2/KitchenSink.air -o out.airc  # custom output path
-
-# Generate backend code from .airc artifact
-air backend langgraph build/FactCheckedPublish.airc    # -> build/FactCheckedPublish_langgraph.py
-air backend langgraph build/FactCheckedPublish.airc -o out.py
-
-# Run a compiled workflow on the reference Agent VM
+air backend langgraph build/FactCheckedPublish.airc     # -> build/FactCheckedPublish_langgraph.py
 python runtime/run_workflow.py build/FactCheckedPublish.airc
-
-# Run generated LangGraph code directly
-python build/FactCheckedPublish_langgraph.py
-
-# Run tests
 python -m pytest tests/ -v
 ```
 
-## Compiler Pipeline
+## AIR Compiler Pipeline
 
 ```
 AIR source (.air)
-      |
-  Lark parser (spec/v0.2/air.lark + air_parser.py AirIndenter)
-      |
-  Parse tree
-      |
-  ast_builder.py --- typed AST (air_ast.py dataclasses)
-      |
-  semantic_check.py --- validates SSA, node names, routes, variables
-      |
-  cfg_builder.py --- control flow graph (cfg.py dataclasses)
-      |
-  air_graph/builder.py --- AIR Graph (air_graph/schema.py)
-      |
-  air_graph/serializer.py --- .airc JSON artifact (validated against schema)
-      |
-  backends/<name>/backend.py --- executable code (e.g. LangGraph Python)
-      |
-  runtime/agent_vm.py or LangGraph runtime --- execution
+  → Lark parser (spec/v0.2/air.lark + air_parser.py AirIndenter)
+  → Parse tree
+  → ast_builder.py → typed AST (air_ast.py dataclasses)
+  → semantic_check.py → validates SSA, node names, routes, variables
+  → cfg_builder.py → control flow graph (cfg.py dataclasses)
+  → air_graph/builder.py → AIR Graph (air_graph/schema.py)
+  → air_graph/serializer.py → .airc JSON artifact (validated against schema)
+  → backends/<name>/backend.py → executable code (e.g. LangGraph Python)
+  → runtime/agent_vm.py or LangGraph runtime → execution
 ```
 
-## Language Design
+## AIR Language Design (v0.2)
 
 ### Core Paradigm
-- **SSA (Single Static Assignment)**: variables cannot be reassigned
+- **SSA (Single Static Assignment)**: variables cannot be reassigned within a node
 - **Nodes with explicit names**: no implicit control flow
 - **Deterministic orchestration** with explicitly marked stochastic ops (`llm`, `decide`, `session`)
 - **First-class fault handling**: failures are values, not exceptions
-
-### Program Structure (v0.2)
-```
-@air 0.2 [mode=strict]
-
-workflow Name(param: Type) -> ReturnType | ReturnType:
-    node entry_node:
-        <statements>
-
-    node other_node(param) [max=N]:
-        <statements>
-
-    node fallback_node [fallback]:
-        <statements>
-```
 
 ### Instructions
 | Category | Instruction | Returns |
@@ -165,7 +55,9 @@ workflow Name(param: Type) -> ReturnType | ReturnType:
 | Stochastic | `llm(prompt, args...)` | `Message` |
 | Stochastic | `session(members, protocol, history)` | result with `.consensus` |
 | Deterministic | `tool(name, args...)` | `Artifact \| Fault` |
+| Composition | `map(collection, Workflow) [concurrency=N, on_error=X]` | `Type[]` |
 | Extraction | `transform(value) as Type via llm(prompt)` | `Type \| Fault` |
+| Extraction | `transform(value) as Type via func(name)` | `Type` |
 | Governance | `verify(input, rule)` | `Verdict + Evidence` |
 | Aggregation | `aggregate([verdicts], strategy)` | `Consensus` |
 | Gate | `gate(verdict\|consensus)` | `Outcome` |
@@ -176,111 +68,64 @@ workflow Name(param: Type) -> ReturnType | ReturnType:
 ### Built-in Types
 `Message`, `Artifact`, `Fault`, `Verdict`, `Consensus`, `Outcome`, `Evidence`, `Claim[]`
 
-### Fault Semantics
-Only two operations produce `Fault` in v0.2:
-- `transform ... via llm` -- schema validation failure after retries
-- `tool` -- semantic operation failure after retries
+## Adding a New Language Construct
 
-Bounded nodes (`[max=N]`) reaching their limit transition to the fallback node.
+When adding a new instruction or expression type, touch these files in order:
 
-`llm`, `decide`, and `session` are stochastic and never produce `Fault` (transport failures handled by runtime).
+1. **Test fixture** — `tests/fixtures/<name>.air` — valid .air file exercising the construct
+2. **Grammar** — `spec/v0.2/air.lark` — add rule, wire into expression alternatives
+3. **AST dataclass** — `compiler/air_ast.py` — new `@dataclass` extending `Expression`
+4. **AST builder** — `compiler/ast_builder.py` — `_build_<name>()` method + dispatch in `_build_expression()`
+5. **Semantic check** — `compiler/semantic_check.py` — validation in `_check_expression_refs()`
+6. **CFG builder** — `compiler/cfg_builder.py` — usually no change (expressions don't create edges)
+7. **AIR Graph builder** — `compiler/air_graph/builder.py` — emit `AirGraphOperation` in `_convert_assign()`
+8. **JSON schema** — `spec/v0.2/air_graph.schema.json` — add to operation type enum
+9. **LangGraph backend** — `backends/langgraph/backend.py` — code generation for the operation type
+10. **Agent VM** — `runtime/agent_vm.py` — execution handler + import adapter
+11. **Adapters** — `runtime/adapters.py` — mock adapter function
+12. **Tests** — add cases to `test_grammar.py`, `test_ast_builder.py`, `test_semantic_check.py`, `test_air_graph.py`, `test_langgraph_backend.py`
 
-### Route Exhaustiveness
-Routes on `Outcome` values must cover: `PROCEED`, `RETRY`, `ESCALATE`, `HALT` (or use `else`).
+## Gotchas and Non-Obvious Constraints
 
-### Governance Modes
-- `[mode=normal]` (default): governance primitives optional
-- `[mode=strict]`: compiler rejects workflows where LLM output routes without verify->gate chain
-
-## Parser Notes
-
-The v0.2 grammar uses indentation-aware parsing via a custom `AirIndenter` postlex in `compiler/air_parser.py`. Key detail: the indenter emits `_DEDENT` tokens **before** `_NL` (reversed from Lark's default) so that `_NL` remains available as a statement separator at the outer block level.
-
-Bare `tool(...)`, `llm(...)`, `session(...)` statements are parsed as their respective call types at the grammar level (not as `node_call`). The AST builder handles them directly.
-
-## Semantic Check
-
-The v0.2 semantic checker (`compiler/semantic_check.py`) operates on the typed AST and validates:
-- **Node name uniqueness** within each workflow
-- **SSA** — no variable reassignment within a node; workflow params count as defined (no shadowing)
-- **Variable existence** — workflow params visible in all nodes, node params scoped to node, uppercase-first names treated as types/assets
-- **Route target existence** — targets must reference valid node names
-- **Route exhaustiveness** — Outcome routes need PROCEED/RETRY/ESCALATE/HALT or `else`
-- **Fallback limit** — at most one `[fallback]` node per workflow
-- **Return type validity** — constructor type must be in workflow's declared return types
-- **Node termination** — every node must end with return, route, node call, or unreachable
-
-Keyword node names (llm, tool, verify, etc.) are rejected at the grammar level — all instruction keywords create Lark terminals that take priority over IDENTIFIER.
+- **AirIndenter emits `_DEDENT` before `_NL`** (reversed from Lark's default) so `_NL` remains available as a statement separator at the outer block level. See `compiler/air_parser.py`.
+- **Multi-line constructors don't parse.** The grammar doesn't support newlines inside constructor field lists — flatten to single line.
+- **Keywords are reserved via Lark terminal priority**, not the semantic checker. Writing `"map"` in a grammar rule auto-creates a terminal that takes priority over `IDENTIFIER`. This means `map`, `func`, `llm`, etc. cannot be used as node names without any explicit check.
+- **Bracket modifiers are scoped to their construct**, not global keywords. `concurrency`/`on_error` are map modifiers; `max`/`fallback` are node modifiers. They live in separate grammar rules.
+- **No type checking exists.** Types are parsed and stored in the AST but never validated. No type coupling, no field access validation, no collection homogeneity. This is a full-pipeline feature touching every stage — don't try to add it piecemeal.
+- **No asset resolution.** Prompts, rules, schemas, providers, func names are all treated as opaque strings. The runtime resolves them by name.
+- **No cross-file workflow references.** `map(items, Workflow)` only validates against workflows in the same .air file. A cross-file compilation model doesn't exist.
+- **No governance enforcement.** `[mode=strict]` is parsed and stored but the compiler doesn't enforce the verify→gate chain requirement.
+- **Bare statements** — `tool(...)`, `llm(...)`, `session(...)` as bare statements (no assignment) are parsed as their respective call types at the grammar level, not as `node_call`. The AST builder handles them directly.
 
 ## Testing
 
-Tests use shared `.air` fixture files in `tests/fixtures/`. Fixtures are semantically valid (variables declared as workflow params). Test helpers in `tests/helpers.py`:
+Tests use shared `.air` fixture files in `tests/fixtures/`. Fixtures must be semantically valid (variables declared as workflow params). Test helpers in `tests/helpers.py`:
 - `load_fixture(name)` — load fixture source by name
 - `build_fixture(parser, name)` — parse + build AST from fixture
 - `find_node(program, node_name)` — locate a node by name
 
 pytest is configured in `pyproject.toml` with `pythonpath = ["tests", "compiler"]`.
 
-## LangGraph Backend
+## TODO
 
-The LangGraph backend (`backends/langgraph/backend.py`) generates self-contained Python files using LangGraph's `StateGraph`. Key design:
-
-- **`generate(air_graph)`** — pure code generation (returns string), no file I/O
-- **`compile(air_graph, output_path)`** — calls `generate()` then writes to file
-- **Dynamic imports** — only imports adapters actually used by the workflow
-- **Dotted route variables** — `result.consensus` → `state["result"]["consensus"]`
-- **Bool/else conditions** — routes on booleans use `true`/`false` keys; else uses `__else__`
-- **Mixed terminal + edges** — nodes with inline return AND route edges get conditional edges (not just END)
-- **Bare operations** — tool/llm/session without assignment produce side-effect-only code
-- **All generated code is syntactically valid Python** (verified by `compile()` in tests)
-- **Nested expressions** — `gate(aggregate(...))` flattened into two operations with synthetic `__agg__` variable
-
-## Agent VM
-
-The reference Agent VM (`runtime/agent_vm.py`) executes `.airc` artifacts directly. Updated for v0.2:
-- All v0.2 operation types including `session`
-- `else` and `bool` condition matching in edge resolution
-- Dotted route variables (`result.consensus` → nested dict access)
-- Return with inputs (not just constructor fields)
-- Bare tool operations (no output variable)
-
-## What Is Implemented vs TODO
-
-### Implemented
-- [x] Full language spec v0.1 + v0.2
-- [x] Lark grammar v0.2 with indentation-aware parsing
-- [x] AST dataclass definitions v0.2
-- [x] AST builder v0.2 (parse tree -> typed AST)
-- [x] Semantic check v0.2 (SSA, variable existence, routes, fallback, return types, termination)
-- [x] CFG builder v0.2 (AST -> control flow graph)
-- [x] AIR Graph builder + serializer v0.2 (with JSON schema)
-- [x] Grammar (45) + AST (36) + semantic (48) + CFG (18) + AIR Graph (36) + LangGraph (54) = 237 tests
-- [x] Shared test fixtures (15 .air files)
-- [x] 3 v0.2 example workflows (FactCheckedPublish, MultiModelChat, KitchenSink)
-- [x] CLI updated for v0.2 pipeline (`air compile`, `air backend`)
-- [x] LangGraph backend v0.2 code generator
-- [x] Agent VM v0.2 (session, else/bool routing, dotted variables)
-- [x] Mock runtime adapters v0.2 (session_adapter, tool_adapter, varargs)
-
-### TODO
 - [ ] Type system validation (type coupling rules, Section 22 of language spec)
+- [ ] Governance enforcement (`[mode=strict]` verify→gate chain)
 - [ ] Reachability / dead code analysis
 - [ ] Error messages with source locations
+- [ ] Cross-file workflow references
+- [ ] AIR Assets — asset manifest, resolution, and validation
 
 ## Key Files to Read First
 
-1. [spec/v0.2/01_air_language_spec.md](spec/v0.2/01_air_language_spec.md) -- latest language semantics
-2. [compiler/air_ast.py](compiler/air_ast.py) -- AST node structure (v0.2)
-3. [compiler/ast_builder.py](compiler/ast_builder.py) -- parse tree -> AST (v0.2)
-4. [examples/v0.2/KitchenSink.air](examples/v0.2/KitchenSink.air) -- comprehensive v0.2 example
-5. [compiler/cli.py](compiler/cli.py) -- CLI entry point
-6. [backends/langgraph/backend.py](backends/langgraph/backend.py) -- code generation
+1. `spec/v0.2/01_air_language_spec.md` — AIR Language semantics
+2. `compiler/air_ast.py` — AST node structure
+3. `compiler/ast_builder.py` — parse tree → AST
+4. `examples/v0.2/KitchenSink.air` — comprehensive example
+5. `backends/langgraph/backend.py` — code generation
 
 ## Dependencies
 
 - Python 3.12+ (`.venv` present)
-- `lark` -- parser library
-- `pytest` -- testing
-- `jsonschema` -- .airc artifact validation
-
-Activate venv: `source .venv/bin/activate`
+- `lark` — parser library
+- `pytest` — testing
+- `jsonschema` — .airc artifact validation
