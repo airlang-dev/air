@@ -1,12 +1,12 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-AIR_GRAPH_VERSION = "0.1"
+AIR_GRAPH_VERSION = "0.2"
 
 
 @dataclass
 class AirGraphCondition:
-    kind: str  # "type", "enum", "continue"
+    kind: str  # "type", "enum", "bool", "else"
     name: Optional[str] = None
     value: Optional[str] = None
     is_list: bool = False
@@ -21,9 +21,9 @@ class AirGraphOutput:
 @dataclass
 class AirGraphOperation:
     type: str
-    inputs: List[str] = field(default_factory=list)
-    outputs: List[AirGraphOutput] = field(default_factory=list)
-    params: Dict[str, Any] = field(default_factory=dict)
+    inputs: list[str] = field(default_factory=list)
+    outputs: list[AirGraphOutput] = field(default_factory=list)
+    params: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -35,9 +35,9 @@ class AirGraphEdge:
 @dataclass
 class AirGraphNode:
     name: str
-    operations: List[AirGraphOperation] = field(default_factory=list)
+    operations: list[AirGraphOperation] = field(default_factory=list)
     route_variable: Optional[str] = None
-    edges: List[AirGraphEdge] = field(default_factory=list)
+    edges: list[AirGraphEdge] = field(default_factory=list)
     terminal: bool = False
 
 
@@ -45,7 +45,7 @@ class AirGraphNode:
 class AirGraphWorkflow:
     name: str
     entry: str
-    nodes: List[AirGraphNode] = field(default_factory=list)
+    nodes: list[AirGraphNode] = field(default_factory=list)
 
     def __repr__(self):
         lines = [f"AirGraphWorkflow({self.name!r}, entry={self.entry!r})\n"]
@@ -66,8 +66,12 @@ class AirGraphWorkflow:
                         label = f"{cond.name}[]" if cond.is_list else cond.name
                     elif cond.kind == "enum":
                         label = cond.value
+                    elif cond.kind == "bool":
+                        label = cond.value
+                    elif cond.kind == "else":
+                        label = "else"
                     else:
-                        label = "continue"
+                        label = str(cond)
                     lines.append(f"  -> {edge.target}  [{label}]")
                 else:
                     lines.append(f"  -> {edge.target}")

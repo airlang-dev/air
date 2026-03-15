@@ -1,3 +1,8 @@
+"""AIR Graph serializer for v0.2.
+
+Converts AirGraphWorkflow to JSON and validates against the v0.2 schema.
+"""
+
 import json
 import os
 
@@ -47,11 +52,12 @@ def serialize_edge(edge):
 def serialize_node(node):
     result = {
         "operations": [serialize_operation(op) for op in node.operations],
+        "terminal": node.terminal,
     }
-    if not node.terminal:
+    if node.route_variable is not None:
         result["route_variable"] = node.route_variable
+    if node.edges:
         result["edges"] = [serialize_edge(e) for e in node.edges]
-    result["terminal"] = node.terminal
     return result
 
 
@@ -73,12 +79,6 @@ def validate_air_graph(data):
     if entry not in data["nodes"]:
         raise ValueError(f"error: entry node '{entry}' does not exist")
 
-    for name, node in data["nodes"].items():
-        if node.get("terminal") and node.get("edges"):
-            raise ValueError(
-                f"error: terminal node '{name}' cannot have outgoing edges"
-            )
-
 
 def write_airc(workflow, output_file):
     data = serialize_air_graph(workflow)
@@ -87,4 +87,4 @@ def write_airc(workflow, output_file):
     with open(output_file, "w") as f:
         json.dump(data, f, indent=2)
 
-    print(f"[✓] AIR Graph written to {output_file}")
+    print(f"[ok] AIR Graph written to {output_file}")

@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AIR Graph Workflow",
+  "description": "AIR Graph v0.2.0",
+  "type": "object",
+  "required": ["air_graph_version", "workflow", "entry", "nodes"],
+  "additionalProperties": false,
+  "properties": {
+    "air_graph_version": {
+      "type": "string",
+      "description": "AIR Graph format version"
+    },
+    "workflow": {
+      "type": "string",
+      "description": "Workflow name"
+    },
+    "entry": {
+      "type": "string",
+      "description": "Entry node name"
+    },
+    "nodes": {
+      "type": "object",
+      "description": "Execution nodes keyed by name",
+      "additionalProperties": {
+        "$ref": "#/$defs/ExecNode"
+      }
+    }
+  },
+  "$defs": {
+    "ExecNode": {
+      "type": "object",
+      "required": ["operations", "terminal"],
+      "additionalProperties": false,
+      "properties": {
+        "operations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Operation" }
+        },
+        "route_variable": {
+          "type": "string",
+          "description": "Variable used for routing (may use dot notation)"
+        },
+        "edges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Edge" }
+        },
+        "terminal": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Operation": {
+      "type": "object",
+      "required": ["type", "inputs", "outputs", "params"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["llm", "transform", "verify", "aggregate", "gate", "decide", "session", "return", "tool", "construct"]
+        },
+        "inputs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "outputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Output" }
+        },
+        "params": {
+          "type": "object"
+        }
+      }
+    },
+    "Output": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      }
+    },
+    "Edge": {
+      "type": "object",
+      "required": ["target"],
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "$ref": "#/$defs/Condition"
+        },
+        "target": {
+          "type": "string"
+        }
+      }
+    },
+    "Condition": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["type", "enum", "bool", "else"]
+        },
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "is_list": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
