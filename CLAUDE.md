@@ -31,8 +31,8 @@ air/
 │   ├── air_ast.py                         # AST dataclass definitions (v0.2)
 │   ├── ast_builder.py                     # Lark parse tree -> AIR AST (v0.2)
 │   ├── semantic_check.py                  # Semantic validation (v0.2)
-│   ├── cfg.py                             # CFG dataclasses — still v0.1
-│   ├── cfg_builder.py                     # AST -> CFG construction — still v0.1
+│   ├── cfg.py                             # CFG dataclasses (v0.2)
+│   ├── cfg_builder.py                     # AST -> CFG construction (v0.2)
 │   └── air_graph/
 │       ├── schema.py                      # AIR Graph dataclasses
 │       ├── builder.py                     # CFG -> AIR Graph
@@ -225,15 +225,15 @@ pytest is configured in `pyproject.toml` with `pythonpath = ["tests", "compiler"
 - [x] AST dataclass definitions v0.2
 - [x] AST builder v0.2 (parse tree -> typed AST)
 - [x] Semantic check v0.2 (SSA, variable existence, routes, fallback, return types, termination)
-- [x] Grammar tests (45) + AST builder tests (36) + semantic check tests (48) = 129 tests
+- [x] CFG builder v0.2 (AST -> control flow graph)
+- [x] Grammar tests (45) + AST builder tests (36) + semantic check tests (48) + CFG tests (18) = 147 tests
 - [x] Shared test fixtures (15 .air files)
 - [x] 3 v0.2 example workflows (FactCheckedPublish, MultiModelChat, KitchenSink)
-- [x] v0.1 compiler pipeline (CFG, AIR Graph, serializer)
+- [x] v0.1 AIR Graph, serializer (not yet updated for v0.2)
 - [x] v0.1 LangGraph backend code generator
 - [x] v0.1 Reference Agent VM runtime with mock adapters
 
 ### TODO
-- [ ] CFG builder v0.2
 - [ ] AIR Graph builder + serializer v0.2
 - [ ] LangGraph backend v0.2
 - [ ] Type system validation (type coupling rules, Section 22 of language spec)
