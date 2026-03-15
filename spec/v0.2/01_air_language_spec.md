@@ -210,7 +210,7 @@ Reserved instruction keywords:
 
 ```
 llm, tool, transform, verify, aggregate, gate,
-decide, session, route, return, unreachable, parallel
+decide, session, map, route, return, unreachable, parallel, func
 ```
 
 ---
@@ -366,7 +366,7 @@ consensus = aggregate([check_claude, check_gpt], unanimous)
 
 ### Conversational Prompts
 
-In multi-turn patterns (Section 29), prompt assets like `claude`, `gpt`, `gemini` are conversational prompt assets — each specifies a model and a system prompt or persona:
+In multi-turn patterns (Section 31), prompt assets like `claude`, `gpt`, `gemini` are conversational prompt assets — each specifies a model and a system prompt or persona:
 
 ```yaml
 # prompts/claude.yaml
@@ -413,7 +413,7 @@ Artifact | Fault
 
 A tool invocation can fail semantically (API error, database unavailable, file not found, permission denied). The runtime retries transient failures according to its configured policy. After retries are exhausted, failure produces Fault.
 
-Tool faults follow standard fault precedence (see Section 20).
+Tool faults follow standard fault precedence (see Section 21).
 
 ---
 
@@ -517,7 +517,7 @@ Type signature:
 transform(input) as T via func(function_asset) → T | Fault
 ```
 
-Function-assisted transform is deterministic. It never invokes an LLM. The function asset is a named reference resolved at compile time (see Section 23). The runtime is responsible for loading and executing the function. Failures — exceptions raised by the function or schema validation errors — produce `Fault`.
+Function-assisted transform is deterministic. It never invokes an LLM. The function asset is a named reference resolved at compile time (see Section 25). The runtime is responsible for loading and executing the function. Failures — exceptions raised by the function or schema validation errors — produce `Fault`.
 
 ### Transform Summary
 
@@ -819,7 +819,7 @@ response_format: "MOVE: content"
 
 ---
 
-# 16a. Map Instruction
+# 17. Map Instruction
 
 Applies a workflow to each element of a collection, collecting results into an array.
 
@@ -981,7 +981,7 @@ This means a strict outer workflow can invoke a normal sub-workflow via `map`. G
 
 ### Interaction with Fault Handling
 
-`map` with `on_error=halt` produces `R[] | Fault`. This follows standard fault precedence (Section 20):
+`map` with `on_error=halt` produces `R[] | Fault`. This follows standard fault precedence (Section 21):
 
 ```air
 results = map(articles, AnalyzeArticle)
@@ -1014,7 +1014,7 @@ workflow ScoreAll(articles: Article[]) -> Artifact | Fault:
 
 ---
 
-# 17. Route Instruction
+# 18. Route Instruction
 
 Performs conditional branching.
 
@@ -1070,7 +1070,7 @@ Routes must be exhaustive. Valid if all cases are covered or `else` exists. A no
 
 ---
 
-# 18. Parallel Block
+# 19. Parallel Block
 
 Executes instructions concurrently.
 
@@ -1109,7 +1109,7 @@ parallel [partial]:  — partial, faults become individual values
 
 ---
 
-# 19. Bounded Nodes
+# 20. Bounded Nodes
 
 AIR does not have a loop construct. Retries and iteration are expressed as bounded back-edges between nodes.
 
@@ -1146,7 +1146,7 @@ If the maximum visit count is exceeded, the node produces:
 Fault(reason="max visits exceeded")
 ```
 
-This Fault follows normal fault precedence (see Section 20).
+This Fault follows normal fault precedence (see Section 21).
 
 ### SSA Across Visits
 
@@ -1154,7 +1154,7 @@ Each visit to a bounded node creates fresh SSA bindings. The compiler resolves v
 
 ---
 
-# 20. Fault Handling
+# 21. Fault Handling
 
 `Fault` is a value, not an exception. It flows through the workflow explicitly and must be handled like any other typed value.
 
@@ -1168,12 +1168,15 @@ Fault {
 
 ### Fault Sources
 
-Three operations can produce Faults:
+Six sources can produce Faults:
 
 ```
-transform via llm  — schema validation failure after retries
-tool               — semantic operation failure after retries
-bounded node       — max visit count exceeded
+transform (coercion)     — schema coercion failure
+transform via llm        — schema validation failure after retries
+transform via func       — function exception or schema validation failure
+tool                     — semantic operation failure after retries
+map [on_error=halt]      — sub-workflow Fault propagated (default error policy)
+bounded node             — max visit count exceeded
 ```
 
 ### Fault Precedence
@@ -1213,7 +1216,7 @@ In AI workflows, failure is expected, not exceptional. LLMs produce malformed ou
 
 ---
 
-# 21. Failure Boundary
+# 22. Failure Boundary
 
 AIR distinguishes two categories of external operations.
 
@@ -1231,12 +1234,18 @@ These produce best-effort answers. If the provider fails (timeout, rate limit, u
 
 ```
 tool
+transform
+map
 ```
 
-These represent semantic operations with a defined success condition. Failure must be observable in AIR:
+These represent operations with a defined success condition. Failure must be observable in AIR:
 
 ```
-tool(...) → Artifact | Fault
+tool(...)                        → Artifact | Fault
+transform(...) as T              → T | Fault
+transform(...) as T via llm(p)   → T | Fault
+transform(...) as T via func(f)  → T | Fault
+map(collection, Workflow)        → R[] | Fault  (on_error=halt)
 ```
 
 ### Resulting Rule
@@ -1248,7 +1257,7 @@ Stochastic operations do not expose transport failures to AIR.
 
 ---
 
-# 22. Structured Values and Collections
+# 23. Structured Values and Collections
 
 ### Constructors
 
@@ -1259,11 +1268,11 @@ Artifact(status="verified", summary=summary, verification=outcome)
 Fault(reason="Verification failed")
 ```
 
-The type name must match a type in the workflow's return type declaration or a schema-defined type (Section 23). Fields may be string literals or variable references.
+The type name must match a type in the workflow's return type declaration or a schema-defined type (Section 25). Fields may be string literals or variable references.
 
 ### Array Types
 
-The syntax `T[]` denotes an array of type `T`. `T` may be any built-in type, any primitive, or any user-defined type (see Section 22b for type categories).
+The syntax `T[]` denotes an array of type `T`. `T` may be any built-in type, any primitive, or any user-defined type (see Section 24 for type categories).
 
 Valid array types:
 
@@ -1330,7 +1339,7 @@ An empty collection is expressed with empty brackets:
 results = []
 ```
 
-The type of an empty collection is inferred from context (the variable's usage in subsequent instructions). An empty collection may be used as an initial value before a `map` operation (Section 16a) or as a base case.
+The type of an empty collection is inferred from context (the variable's usage in subsequent instructions). An empty collection may be used as an initial value before a `map` operation (Section 17) or as a base case.
 
 ### Routing on Collections
 
@@ -1370,7 +1379,7 @@ How each instruction interacts with collections:
 
 ---
 
-# 22b. Type System
+# 24. Type System
 
 AIR has two categories of types: built-in types and user-defined types.
 
@@ -1407,7 +1416,7 @@ done = transform(history) as bool via llm(check_done)
 
 ### User-Defined Types
 
-Any type not in the built-in or primitive lists is a **user-defined type**. User-defined types are defined by schema assets in the project's `schemas/` directory (see Section 23).
+Any type not in the built-in or primitive lists is a **user-defined type**. User-defined types are defined by schema assets in the project's `schemas/` directory (see Section 25).
 
 The schema file name determines the type name:
 
@@ -1461,7 +1470,7 @@ If a variable's type cannot be statically determined (e.g., it flows through a g
 
 ---
 
-# 23. Assets
+# 25. Assets
 
 AIR workflows reference external assets. The compiler validates that referenced assets exist. The runtime interprets their content.
 
@@ -1597,7 +1606,7 @@ project/
 
 ---
 
-# 24. Data Flow
+# 26. Data Flow
 
 AIR uses explicit data passing between nodes. There is no shared state.
 
@@ -1643,7 +1652,7 @@ Runtime context     → implicit, managed by runtime
 
 ---
 
-# 25. Type Coupling Rules
+# 27. Type Coupling Rules
 
 Instruction typing contracts:
 
@@ -1665,17 +1674,17 @@ Instruction typing contracts:
 
 The compiler enforces these rules during static analysis.
 
-`T` in `transform` rows may be a scalar type or an array type (`T[]`). See Section 22 for collection semantics.
+`T` in `transform` rows may be a scalar type or an array type (`T[]`). See Section 23 for collection semantics.
 
-`Verdict[]` in the `aggregate` row is constructed from a collection literal (e.g., `[v1, v2, v3]`) — see Section 22 for concatenation rules.
+`Verdict[]` in the `aggregate` row is constructed from a collection literal (e.g., `[v1, v2, v3]`) — see Section 23 for concatenation rules.
 
-`map` return type depends on error policy: `R[]` with `on_error=skip`, `R[] | Fault` with `on_error=halt` (default), `(R | Fault)[]` with `on_error=collect`. See Section 16a.
+`map` return type depends on error policy: `R[]` with `on_error=skip`, `R[] | Fault` with `on_error=halt` (default), `(R | Fault)[]` with `on_error=collect`. See Section 17.
 
-`T` and `R` in the table may be built-in types, primitives, or user-defined types (schema assets). All type references are resolved as described in Section 22b.
+`T` and `R` in the table may be built-in types, primitives, or user-defined types (schema assets). All type references are resolved as described in Section 24.
 
 ---
 
-# 26. Control Flow Summary
+# 28. Control Flow Summary
 
 AIR has three control flow mechanisms:
 
@@ -1698,7 +1707,7 @@ There are no hidden control paths. Every transition is explicit.
 
 ---
 
-# 27. Example: Fact-Checked Publish
+# 29. Example: Fact-Checked Publish
 
 ```air
 @air 0.2
@@ -1745,7 +1754,7 @@ workflow Fact_Checked_Publish(content: Message) -> Artifact | Fault:
 
 ---
 
-# 28. Example: Multi-LLM Debate
+# 30. Example: Multi-LLM Debate
 
 ```air
 @air 0.2
@@ -1779,7 +1788,7 @@ workflow Parley(task: Message, members: Participants, protocol: Protocol) -> Art
 
 ---
 
-# 29. Example: Simple Multi-LLM Chat
+# 31. Example: Simple Multi-LLM Chat
 
 ```air
 @air 0.2
@@ -1805,7 +1814,7 @@ workflow MultiLLMChat(task: Message) -> Artifact | Fault:
 
 ---
 
-# 29a. Example: Batch Analysis Pipeline
+# 32. Example: Batch Analysis Pipeline
 
 Two workflows demonstrating `map` for data-dependent iteration. The outer workflow processes a collection of articles through a per-item analysis workflow, computes aggregate statistics, and produces a final report.
 
@@ -1928,7 +1937,7 @@ workflow BatchAnalysis(articles: Article[]) -> Artifact | Fault:
 
     node publish(results, stats, narrative):
         return Artifact(
-            article_count=results,
+            analyses=results,
             statistics=stats,
             report=narrative
         )
@@ -1948,7 +1957,7 @@ workflow BatchAnalysis(articles: Article[]) -> Artifact | Fault:
 
 ---
 
-# 30. Version Declaration
+# 33. Version Declaration
 
 AIR programs declare language version and optional governance mode.
 
@@ -1961,7 +1970,7 @@ Future versions may extend the language while maintaining compatibility.
 
 ---
 
-# 31. Compilation
+# 34. Compilation
 
 The AIR compiler performs:
 
@@ -1974,7 +1983,7 @@ AIR source → parse → AST → semantic analysis → CFG → AIR Graph (.airc)
 The compiler performs the following checks:
 
 * symbol resolution — all assets, node references, and workflow references exist
-* type resolution — every type reference resolves to a built-in type, primitive, or schema asset (Section 22b)
+* type resolution — every type reference resolves to a built-in type, primitive, or schema asset (Section 24)
 * SSA validation — variables assigned once per node scope
 * type checking — instruction inputs match type coupling rules
 * exhaustive routing — all route patterns cover all cases
@@ -2006,7 +2015,7 @@ Runtime adapters consume the AIR Graph. The adapter is responsible for translati
 
 ---
 
-# 32. Related Specifications
+# 35. Related Specifications
 
 Additional AIR specifications define:
 
