@@ -4,7 +4,7 @@
 
 **AIR** (Agentic Intermediate Representation) is a domain-specific language for describing AI agent workflows in a structured, portable, and governed manner. It acts as an IR layer between high-level orchestration intent and agent VM execution — analogous to how LLVM IR sits between source code and machine code.
 
-**Status: Work in progress — v0.2 grammar, parser, AST builder implemented with tests. Semantic check, CFG, and downstream pipeline still on v0.1.**
+**Status: v0.2 compiler pipeline fully implemented — grammar through LangGraph backend and Agent VM.**
 
 ## Directory Structure
 
@@ -52,6 +52,10 @@ air/
 │   ├── helpers.py                         # Test helpers (load_fixture, build_fixture, find_node)
 │   ├── test_grammar.py                    # Lark grammar tests (45 tests)
 │   ├── test_ast_builder.py                # AST builder tests (36 tests)
+│   ├── test_semantic_check.py             # Semantic check tests (48 tests)
+│   ├── test_cfg_builder.py                # CFG builder tests (18 tests)
+│   ├── test_air_graph.py                  # AIR Graph builder + serializer tests (36 tests)
+│   ├── test_langgraph_backend.py          # LangGraph backend tests (54 tests)
 │   └── fixtures/                          # Shared .air test fixtures
 │       ├── basic.air                      # Minimal valid program
 │       ├── basic_strict.air               # With [mode=strict]
@@ -91,18 +95,18 @@ The compiler is installed as the `air` command via pyproject.toml.
 source .venv/bin/activate
 
 # Compile AIR source to AIR Graph artifact (.airc)
-air compile examples/v0.1/example_1.air                # -> build/aurora_fact_check.airc
-air compile examples/v0.1/example_1.air -o out.airc   # custom output path
+air compile examples/v0.2/FactCheckedPublish.air       # -> build/FactCheckedPublish.airc
+air compile examples/v0.2/KitchenSink.air -o out.airc  # custom output path
 
 # Generate backend code from .airc artifact
-air backend langgraph build/aurora_fact_check.airc     # -> build/aurora_fact_check_langgraph.py
-air backend langgraph build/aurora_fact_check.airc -o out.py
-
-# Dev tool — parse + validate + print AST (no artifact output)
-python compiler/validate_air.py
+air backend langgraph build/FactCheckedPublish.airc    # -> build/FactCheckedPublish_langgraph.py
+air backend langgraph build/FactCheckedPublish.airc -o out.py
 
 # Run a compiled workflow on the reference Agent VM
-python runtime/run_workflow.py build/aurora_fact_check.airc
+python runtime/run_workflow.py build/FactCheckedPublish.airc
+
+# Run generated LangGraph code directly
+python build/FactCheckedPublish_langgraph.py
 
 # Run tests
 python -m pytest tests/ -v
@@ -229,6 +233,16 @@ The LangGraph backend (`backends/langgraph/backend.py`) generates self-contained
 - **Mixed terminal + edges** — nodes with inline return AND route edges get conditional edges (not just END)
 - **Bare operations** — tool/llm/session without assignment produce side-effect-only code
 - **All generated code is syntactically valid Python** (verified by `compile()` in tests)
+- **Nested expressions** — `gate(aggregate(...))` flattened into two operations with synthetic `__agg__` variable
+
+## Agent VM
+
+The reference Agent VM (`runtime/agent_vm.py`) executes `.airc` artifacts directly. Updated for v0.2:
+- All v0.2 operation types including `session`
+- `else` and `bool` condition matching in edge resolution
+- Dotted route variables (`result.consensus` → nested dict access)
+- Return with inputs (not just constructor fields)
+- Bare tool operations (no output variable)
 
 ## What Is Implemented vs TODO
 
@@ -240,11 +254,13 @@ The LangGraph backend (`backends/langgraph/backend.py`) generates self-contained
 - [x] Semantic check v0.2 (SSA, variable existence, routes, fallback, return types, termination)
 - [x] CFG builder v0.2 (AST -> control flow graph)
 - [x] AIR Graph builder + serializer v0.2 (with JSON schema)
-- [x] Grammar (45) + AST (36) + semantic (48) + CFG (18) + AIR Graph (35) + LangGraph (54) = 236 tests
+- [x] Grammar (45) + AST (36) + semantic (48) + CFG (18) + AIR Graph (36) + LangGraph (54) = 237 tests
 - [x] Shared test fixtures (15 .air files)
 - [x] 3 v0.2 example workflows (FactCheckedPublish, MultiModelChat, KitchenSink)
+- [x] CLI updated for v0.2 pipeline (`air compile`, `air backend`)
 - [x] LangGraph backend v0.2 code generator
-- [x] v0.1 Reference Agent VM runtime with mock adapters
+- [x] Agent VM v0.2 (session, else/bool routing, dotted variables)
+- [x] Mock runtime adapters v0.2 (session_adapter, tool_adapter, varargs)
 
 ### TODO
 - [ ] Type system validation (type coupling rules, Section 22 of language spec)
