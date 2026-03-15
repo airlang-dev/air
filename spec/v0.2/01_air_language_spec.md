@@ -1263,7 +1263,7 @@ The type name must match a type in the workflow's return type declaration or a s
 
 ### Array Types
 
-The syntax `T[]` denotes an array of type `T`. `T` may be any built-in type, any schema-defined type, or `Fault`.
+The syntax `T[]` denotes an array of type `T`. `T` may be any built-in type, any primitive, or any user-defined type (see Section 22b for type categories).
 
 Valid array types:
 
@@ -1370,6 +1370,97 @@ How each instruction interacts with collections:
 
 ---
 
+# 22b. Type System
+
+AIR has two categories of types: built-in types and user-defined types.
+
+### Built-In Types
+
+These types are intrinsic to the AIR language. They do not require schema definitions.
+
+```
+Message       — LLM output (opaque text/structured content)
+Artifact      — successful workflow output (has named fields)
+Fault         — failure value (has reason field)
+Verdict       — verification result (PASS, FAIL, UNCERTAIN)
+Evidence      — supporting data from verification
+Consensus     — aggregated verification result
+Outcome       — gate/decide output (PROCEED, RETRY, ESCALATE, HALT)
+```
+
+### Primitive Types
+
+Three primitive types are built-in for use in transforms and route conditions:
+
+```
+bool          — true or false
+Number        — numeric value (integer or floating-point)
+string        — text value
+```
+
+Primitives do not require schema definitions. They are valid as transform targets:
+
+```air
+count = transform(text) as Number
+done = transform(history) as bool via llm(check_done)
+```
+
+### User-Defined Types
+
+Any type not in the built-in or primitive lists is a **user-defined type**. User-defined types are defined by schema assets in the project's `schemas/` directory (see Section 23).
+
+The schema file name determines the type name:
+
+```
+schemas/article.schema.json       → Article
+schemas/features.schema.json      → Features
+schemas/analysis_result.schema.json → AnalysisResult
+schemas/claim.schema.json         → Claim
+```
+
+The type name is derived from the file name by converting to PascalCase. The convention is to name schema files in snake_case and reference them in PascalCase in AIR source.
+
+### Type Resolution
+
+The compiler resolves every type reference in AIR source:
+
+1. Check if the name matches a built-in type or primitive
+2. Check if a schema asset exists with that name
+3. If neither, emit a compile error
+
+Type references appear in:
+
+| Context | Example | Compiler check |
+|---------|---------|----------------|
+| Workflow input parameter | `article: Article` | Schema exists |
+| Workflow return type | `-> AnalysisResult \| Fault` | Schema exists |
+| Transform target | `transform(x) as Features` | Schema exists |
+| Array type | `Article[]` | Element type resolves |
+| Constructor | `AnalysisResult(...)` | Schema exists, fields valid |
+| Map sub-workflow input | `map(articles, Analyze)` | Element type matches sub-workflow param type |
+
+### Field Access
+
+Dotted access on a variable (`result.consensus`, `article.markdown`) is validated against the type's schema. The compiler checks that the referenced field exists in the schema's `properties`.
+
+For built-in types with known structure:
+
+```
+Fault.reason        — always valid (Fault has a reason field)
+Consensus.verdicts  — always valid (Consensus has verdicts and evidence)
+```
+
+For user-defined types, the compiler checks the schema:
+
+```air
+// valid if schemas/article.schema.json has a "title" property
+title = transform(article.title) as string
+```
+
+If a variable's type cannot be statically determined (e.g., it flows through a generic instruction), the compiler allows dotted access without field validation. The runtime validates at execution time.
+
+---
+
 # 23. Assets
 
 AIR workflows reference external assets. The compiler validates that referenced assets exist. The runtime interprets their content.
@@ -1410,7 +1501,49 @@ Referenced by `verify()`. Define verification criteria and optionally an enforce
 
 ### Schema Assets
 
-Define structured types used in workflow signatures, transform targets, and collection type parameters.
+A schema asset defines a **named type**. The file name (without extension) becomes the type name. A schema file in `schemas/article.schema.json` defines the type `Article`.
+
+Schema assets are the bridge between AIR's type system and external data structures. Every non-built-in type referenced in AIR source must resolve to a schema asset.
+
+Schema assets are JSON Schema files. The compiler uses them for:
+
+- **Existence checking**: every type reference must resolve to a built-in type or a schema file
+- **Field validation**: dotted access (`article.markdown`) is checked against the schema's properties
+- **Transform validation**: `transform(x) as Features` requires `schemas/features.schema.json` to exist
+- **Map type checking**: `map(articles, AnalyzeArticle)` where `articles` is `Article[]` and `AnalyzeArticle` accepts `Article` — the compiler checks that the element type matches the sub-workflow's input type by name
+
+Example — `schemas/article.schema.json`:
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Article",
+  "type": "object",
+  "required": ["id", "title", "markdown"],
+  "properties": {
+    "id": { "type": "string" },
+    "title": { "type": "string" },
+    "markdown": { "type": "string" },
+    "author": { "type": "string" },
+    "published_at": { "type": "string", "format": "date-time" },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "word_count": { "type": "integer" }
+  }
+}
+```
+
+This schema defines the type `Article`. It can be used in AIR source as:
+
+```air
+workflow AnalyzeArticle(article: Article) -> AnalysisResult | Fault:
+    node extract:
+        features = transform(article) as Features via func(extract_features)
+```
+
+The runtime uses the schema for validation when values enter or leave the workflow (input deserialization, transform output validation, return value validation).
 
 ### Provider Assets
 
@@ -1537,6 +1670,8 @@ The compiler enforces these rules during static analysis.
 `Verdict[]` in the `aggregate` row is constructed from a collection literal (e.g., `[v1, v2, v3]`) — see Section 22 for concatenation rules.
 
 `map` return type depends on error policy: `R[]` with `on_error=skip`, `R[] | Fault` with `on_error=halt` (default), `(R | Fault)[]` with `on_error=collect`. See Section 16a.
+
+`T` and `R` in the table may be built-in types, primitives, or user-defined types (schema assets). All type references are resolved as described in Section 22b.
 
 ---
 
@@ -1839,6 +1974,7 @@ AIR source → parse → AST → semantic analysis → CFG → AIR Graph (.airc)
 The compiler performs the following checks:
 
 * symbol resolution — all assets, node references, and workflow references exist
+* type resolution — every type reference resolves to a built-in type, primitive, or schema asset (Section 22b)
 * SSA validation — variables assigned once per node scope
 * type checking — instruction inputs match type coupling rules
 * exhaustive routing — all route patterns cover all cases
