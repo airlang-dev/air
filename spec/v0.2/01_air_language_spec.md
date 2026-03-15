@@ -273,6 +273,12 @@ decide
 session
 ```
 
+### Composition
+
+```
+map
+```
+
 ### Orchestration
 
 ```
@@ -813,6 +819,201 @@ response_format: "MOVE: content"
 
 ---
 
+# 16a. Map Instruction
+
+Applies a workflow to each element of a collection, collecting results into an array.
+
+```air
+results = map(collection, WorkflowName)
+results = map(collection, WorkflowName) [concurrency=10, on_error=skip]
+```
+
+The first argument is a collection (`T[]`). The second argument is a workflow name. The named workflow must accept a single input parameter of type `T` and return `R | Fault`.
+
+`map` requires that its input is a collection, not a union type. If the input variable might be `Fault`, the caller must route before calling `map`:
+
+```air
+articles = tool(load_data, path)
+
+route articles:
+    Fault: handle_failure
+    else: process(articles)
+
+node process(articles):
+    results = map(articles, AnalyzeArticle)
+```
+
+### Semantics
+
+`map` invokes the named workflow once per element in the input collection. Each invocation is independent — it receives one element, executes the full sub-workflow, and returns a result. The runtime collects all results into an array.
+
+```
+for each item in collection:
+    invoke WorkflowName(item)
+    collect result
+   ↓
+results: R[]
+```
+
+The sub-workflow is a normal AIR workflow. It is independently compilable, testable, and executable. `map` is the only construct that crosses workflow boundaries.
+
+### Type Rules
+
+The return type of `map` depends on the error policy:
+
+```
+Sub-workflow returns: R | Fault
+
+on_error=skip:    map returns R[]           (faults filtered out)
+on_error=halt:    map returns R[] | Fault   (first fault stops execution)
+on_error=collect: map returns (R | Fault)[] (all results preserved)
+```
+
+Default error policy is `halt`.
+
+### Error Policies
+
+#### halt (default)
+
+Execution stops on the first item that produces `Fault`. The `map` expression produces that `Fault`. Items that completed successfully before the failure are discarded — the caller receives only the Fault.
+
+```air
+// stops on first failure — result is R[] or Fault
+results = map(articles, AnalyzeArticle)
+```
+
+This is the safest default. The caller must handle the `Fault` via route or fallback. Use `halt` when any individual failure invalidates the entire batch (e.g., a mandatory preprocessing step).
+
+#### skip
+
+Faulted items are logged by the runtime and excluded from the result array. Execution continues with remaining items. The result array contains only successes, preserving their relative order from the input. The result may be shorter than the input (or empty if all items fault).
+
+```air
+// continues past failures — result is always R[]
+results = map(articles, AnalyzeArticle) [on_error=skip]
+```
+
+If the input has 434 items and 12 fault, the result contains 422 items. The caller cannot determine which input items faulted — use `collect` if that information is needed.
+
+#### collect
+
+All items are processed regardless of individual failures. Each position in the result array is either `R` (success) or `Fault` (failure). The result array has the same length as the input and preserves positional correspondence: `results[i]` is the outcome for `collection[i]`.
+
+```air
+// all results preserved — result is (R | Fault)[]
+results = map(articles, AnalyzeArticle) [on_error=collect]
+```
+
+Use `collect` when the caller needs to know which specific items failed and why. The caller can process successes and failures separately using `transform via func`.
+
+### Ordering
+
+With `on_error=halt` and `on_error=collect`, the result array preserves positional correspondence with the input: `results[i]` is the outcome for `collection[i]`.
+
+With `on_error=skip`, faulted items are removed. The result preserves relative order of successes but is shorter than the input. Positional correspondence is not guaranteed.
+
+### Concurrency
+
+The `concurrency` modifier is a hint to the runtime. It suggests the maximum number of sub-workflow invocations to execute in parallel.
+
+```air
+results = map(articles, AnalyzeArticle) [concurrency=10, on_error=skip]
+```
+
+If omitted, the runtime chooses a default. The runtime may execute fewer concurrent invocations than requested (due to rate limits, resource constraints, or provider quotas). The runtime must never execute more than the specified concurrency.
+
+`concurrency=1` forces serial execution. This is not equivalent to a bounded node with `[max=N]` — bounded nodes express retry logic for a single item, while `map` with `concurrency=1` expresses sequential iteration over a collection.
+
+### Blocking Sub-Workflows
+
+Sub-workflows may contain blocking operations (`decide`, `session`) that require human interaction or extended multi-participant coordination. A sub-workflow invocation that blocks occupies one concurrency slot until it completes. Other items continue processing in the remaining slots.
+
+```air
+// With concurrency=10: if item #47 blocks on a decide, the runtime
+// continues processing items #48–#56 in the other 9 slots.
+// When the decide for #47 completes, its slot becomes available.
+results = map(articles, ReviewArticle) [concurrency=10, on_error=skip]
+```
+
+The runtime must not abandon a blocked sub-workflow. A sub-workflow that enters `decide` or `session` remains in progress until the provider responds. AIR does not impose timeouts on sub-workflow execution — timeout policies are a runtime concern.
+
+### Empty Input
+
+`map` over an empty collection produces an empty result array. No sub-workflow invocations occur.
+
+```air
+results = map([], AnalyzeArticle)       // results is R[] with length 0
+results = map([], AnalyzeArticle) [on_error=halt]   // still R[] (no items to fault)
+```
+
+This is not a `Fault`. An empty input is a valid input.
+
+### Nested Map
+
+A sub-workflow invoked by `map` may itself contain `map`. This enables hierarchical batch processing.
+
+```air
+workflow ProcessCategory(category: Category) -> CategoryResult | Fault:
+    node process:
+        results = map(category.articles, AnalyzeArticle) [on_error=skip]
+        summary = llm(summarize_category, results)
+        return CategoryResult(summary=summary, results=results)
+
+workflow ProcessAll(categories: Category[]) -> Artifact | Fault:
+    node process:
+        results = map(categories, ProcessCategory) [concurrency=5, on_error=skip]
+        return Artifact(categories=results)
+```
+
+Each level of nesting has its own concurrency and error policy. The outer `map` controls how many categories run in parallel. Each `ProcessCategory` invocation controls how many articles within that category run in parallel. The runtime manages the total resource usage across all nesting levels.
+
+### Governance Modes
+
+In `[mode=normal]`, `map` has no additional governance requirements. The sub-workflow's own governance mode applies to its internal execution.
+
+In `[mode=strict]`, the strict mode constraint applies to each workflow independently. The compiler validates each workflow's governance in isolation:
+
+- If the sub-workflow is declared `[mode=strict]`, its internal LLM→route paths must pass through verify→gate chains.
+- If the sub-workflow is declared `[mode=normal]` (or has no mode), it is not subject to strict governance even if the calling workflow is strict.
+- The calling workflow's strict mode does not propagate into the sub-workflow.
+
+This means a strict outer workflow can invoke a normal sub-workflow via `map`. Governance mode is a property of the workflow declaration, not a transitive constraint.
+
+### Interaction with Fault Handling
+
+`map` with `on_error=halt` produces `R[] | Fault`. This follows standard fault precedence (Section 20):
+
+```air
+results = map(articles, AnalyzeArticle)
+
+route results:
+    Fault: handle_failure
+    else: process(results)
+```
+
+`map` with `on_error=skip` never produces `Fault`. The result is always `R[]`, which may be empty. If the caller needs to distinguish "all items faulted" from "no input items", check the collection length before calling `map`.
+
+### Example
+
+```air
+@air 0.2
+
+workflow AnalyzeOne(article: Article) -> Score | Fault:
+    node score:
+        features = transform(article) as Features via func(extract_features)
+        assessment = llm(evaluate_quality, features)
+        result = transform(assessment) as Score via llm(extract_score)
+        return result
+
+workflow ScoreAll(articles: Article[]) -> Artifact | Fault:
+    node process:
+        scores = map(articles, AnalyzeOne) [concurrency=20, on_error=skip]
+        report = llm(summarize_scores, scores)
+        return Artifact(report=report, scores=scores)
+```
+
+---
+
 # 17. Route Instruction
 
 Performs conditional branching.
@@ -1129,7 +1330,7 @@ An empty collection is expressed with empty brackets:
 results = []
 ```
 
-The type of an empty collection is inferred from context (the variable's usage in subsequent instructions). An empty collection may be used as an initial value before a `map` operation (Section TBD) or as a base case.
+The type of an empty collection is inferred from context (the variable's usage in subsequent instructions). An empty collection may be used as an initial value before a `map` operation (Section 16a) or as a base case.
 
 ### Routing on Collections
 
@@ -1324,7 +1525,8 @@ Instruction typing contracts:
 | aggregate          | Verdict[], strategy        | Consensus                     |
 | gate               | Verdict \| Consensus       | Outcome                       |
 | decide             | provider, inputs           | Message?, Outcome             |
-| session            | members, protocol, history | result (Outcome + Message[]) |
+| session            | members, protocol, history | result (Outcome + Message[])  |
+| map                | T[], workflow              | R[] or R[] \| Fault           |
 | route              | Outcome or union types     | control flow                  |
 | return             | Artifact \| Fault          | terminator                    |
 
@@ -1333,6 +1535,8 @@ The compiler enforces these rules during static analysis.
 `T` in `transform` rows may be a scalar type or an array type (`T[]`). See Section 22 for collection semantics.
 
 `Verdict[]` in the `aggregate` row is constructed from a collection literal (e.g., `[v1, v2, v3]`) — see Section 22 for concatenation rules.
+
+`map` return type depends on error policy: `R[]` with `on_error=skip`, `R[] | Fault` with `on_error=halt` (default), `(R | Fault)[]` with `on_error=collect`. See Section 16a.
 
 ---
 
@@ -1466,6 +1670,149 @@ workflow MultiLLMChat(task: Message) -> Artifact | Fault:
 
 ---
 
+# 29a. Example: Batch Analysis Pipeline
+
+Two workflows demonstrating `map` for data-dependent iteration. The outer workflow processes a collection of articles through a per-item analysis workflow, computes aggregate statistics, and produces a final report.
+
+Project structure:
+
+```
+aideas/
+├── workflows/
+│   ├── analyze_article.air
+│   └── batch_analysis.air
+├── prompts/
+│   ├── evaluate_quality.md
+│   ├── detect_ai_claude.yaml        # model: claude-sonnet, template: detect_ai.md
+│   ├── detect_ai_gpt.yaml           # model: gpt-4o, template: detect_ai.md
+│   ├── detect_ai.md                 # shared AI detection template
+│   └── generate_report.md
+├── rules/
+│   └── ai_detection_consistency.rule
+├── schemas/
+│   ├── article.schema.json
+│   ├── features.schema.json
+│   ├── analysis_result.schema.json
+│   └── statistics.schema.json
+└── functions/
+    ├── extract_features.py           # word count, heading count, code blocks, links
+    └── is_nonempty.py
+```
+
+### Workflow 1: AnalyzeArticle
+
+Processes a single article — extracts features, runs parallel AI detection on two models, cross-checks consistency, gates the result, and returns a scored analysis.
+
+```air
+@air 0.2 [mode=strict]
+
+workflow AnalyzeArticle(article: Article) -> AnalysisResult | Fault:
+
+    node extract:
+        features = transform(article) as Features via func(extract_features)
+
+        route features:
+            Fault: abort
+            else: detect(article, features)
+
+    node detect(article, features):
+        parallel:
+            check_claude = llm(detect_ai_claude, article)
+            check_gpt = llm(detect_ai_gpt, article)
+
+        verdict, evidence = verify([check_claude, check_gpt], ai_detection_consistency)
+        outcome = gate(verdict)
+
+        route outcome:
+            PROCEED: score(features, evidence)
+            ESCALATE: score(features, evidence)
+            RETRY: detect(article, features)
+            HALT: abort
+
+    node score(features, evidence):
+        quality = llm(evaluate_quality, features)
+        assessment = transform(quality) as Score via llm(extract_score)
+
+        route assessment:
+            Fault: abort
+            else: done(features, evidence, assessment)
+
+    node done(features, evidence, assessment):
+        return AnalysisResult(
+            features=features,
+            ai_detection=evidence,
+            quality_score=assessment
+        )
+
+    node abort:
+        return Fault(reason="Analysis failed")
+```
+
+### Workflow 2: BatchAnalysis
+
+Orchestrates the batch — maps `AnalyzeArticle` across all articles, computes aggregate statistics, generates a report, and verifies the report's claims before returning.
+
+```air
+@air 0.2 [mode=strict]
+
+workflow BatchAnalysis(articles: Article[]) -> Artifact | Fault:
+
+    node analyze:
+        results = map(articles, AnalyzeArticle) [concurrency=20, on_error=skip]
+
+        has_results = transform(results) as bool via func(is_nonempty)
+
+        route has_results:
+            true: compute(results)
+            false: abort
+
+    node compute(results):
+        stats = tool(compute_statistics, results)
+
+        route stats:
+            Fault: abort
+            else: report(results, stats)
+
+    node report(results, stats):
+        narrative = llm(generate_report, results, stats)
+        claims = transform(narrative) as Claim[] via llm(extract_claims)
+
+        route claims:
+            Fault: publish(results, stats, narrative)
+            else: validate(results, stats, narrative, claims)
+
+    node validate(results, stats, narrative, claims):
+        verdict, evidence = verify(claims, statistical_accuracy)
+        outcome = gate(verdict)
+
+        route outcome:
+            PROCEED: publish(results, stats, narrative)
+            ESCALATE: publish(results, stats, narrative)
+            RETRY: report(results, stats)
+            HALT: abort
+
+    node publish(results, stats, narrative):
+        return Artifact(
+            article_count=results,
+            statistics=stats,
+            report=narrative
+        )
+
+    node abort:
+        return Fault(reason="Pipeline failed")
+```
+
+### Key patterns demonstrated
+
+- **`map` with `on_error=skip`** — tolerates individual article failures, produces partial results
+- **`concurrency=20`** — runtime hint for parallel sub-workflow execution
+- **Cross-model verification** — same AI detection prompt on Claude and GPT via separate prompt assets
+- **Strict governance** — both workflows enforce verify→gate on every LLM→route path
+- **Workflow composition** — `BatchAnalysis` invokes `AnalyzeArticle` via `map`, each independently compilable
+- **Emptiness check** — `transform via func(is_nonempty)` to route on whether `map` produced any results
+
+---
+
 # 30. Version Declaration
 
 AIR programs declare language version and optional governance mode.
@@ -1491,13 +1838,14 @@ AIR source → parse → AST → semantic analysis → CFG → AIR Graph (.airc)
 
 The compiler performs the following checks:
 
-* symbol resolution — all assets and node references exist
+* symbol resolution — all assets, node references, and workflow references exist
 * SSA validation — variables assigned once per node scope
 * type checking — instruction inputs match type coupling rules
 * exhaustive routing — all route patterns cover all cases
 * bounded cycles — every back-edge targets a node with [max=N]
 * fault coverage — all possible Faults are handled (route, fallback, return type, or compile error)
 * governance enforcement (strict mode) — every llm→route path passes through verify → gate
+* map validation — sub-workflow exists, is independently compilable, accepts exactly one input parameter, input collection element type matches sub-workflow input type, and sub-workflow declares a return type
 
 ### AIR Graph
 
