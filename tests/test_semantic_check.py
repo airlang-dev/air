@@ -54,6 +54,7 @@ class TestValidPrograms:
         "return_fields",
         "list_assignment",
         "route",
+        "map",
     ])
     def test_fixture_passes(self, parser, fixture):
         check_fixture(parser, fixture)
@@ -89,7 +90,7 @@ class TestNodeNameKeywords:
     @pytest.mark.parametrize("keyword", [
         "llm", "tool", "session", "route", "return",
         "unreachable", "parallel", "verify", "aggregate",
-        "gate", "decide", "transform",
+        "gate", "decide", "transform", "map", "func",
     ])
     def test_grammar_prevents_keyword_node_name(self, parser, keyword):
         """Instruction keywords can't be used as node names (grammar rejects)."""
@@ -454,3 +455,90 @@ workflow W(data: Message) -> Artifact:
         return Artifact(data=x)
 """
         check(parser, src)  # should not raise
+
+
+# ---------------------------------------------------------------------------
+# Map instruction
+# ---------------------------------------------------------------------------
+
+class TestMap:
+
+    def test_map_unknown_workflow(self, parser):
+        src = """
+@air 0.2
+
+workflow W(items: Item[]) -> Result:
+    node start:
+        results = map(items, NonExistent)
+        return Result(data=results)
+"""
+        with pytest.raises(SemanticError, match="Unknown workflow.*NonExistent"):
+            check(parser, src)
+
+    def test_map_valid_same_file_workflow(self, parser):
+        src = """
+@air 0.2
+
+workflow Outer(items: Item[]) -> Result:
+    node start:
+        results = map(items, Inner)
+        return Result(data=results)
+
+workflow Inner(item: Item) -> Result:
+    node run:
+        s = llm(summarize, item)
+        return Result(output=s)
+"""
+        check(parser, src)  # should not raise
+
+    def test_map_invalid_on_error(self, parser):
+        src = """
+@air 0.2
+
+workflow Outer(items: Item[]) -> Result:
+    node start:
+        results = map(items, Inner) [on_error=ignore]
+        return Result(data=results)
+
+workflow Inner(item: Item) -> Result:
+    node run:
+        s = llm(summarize, item)
+        return Result(output=s)
+"""
+        with pytest.raises(SemanticError, match="Invalid on_error.*ignore"):
+            check(parser, src)
+
+    def test_map_undefined_collection(self, parser):
+        src = """
+@air 0.2
+
+workflow Outer -> Result:
+    node start:
+        results = map(missing, Inner)
+        return Result(data=results)
+
+workflow Inner(item: Item) -> Result:
+    node run:
+        s = llm(summarize, item)
+        return Result(output=s)
+"""
+        with pytest.raises(SemanticError, match="Undefined.*missing"):
+            check(parser, src)
+
+    def test_map_valid_on_error_values(self, parser):
+        """All three on_error values should be accepted."""
+        for policy in ("halt", "skip", "collect"):
+            src = f"""
+@air 0.2
+
+workflow Outer(items: Item[]) -> Result:
+    node start:
+        results = map(items, Inner) [on_error={policy}]
+        return Result(data=results)
+
+workflow Inner(item: Item) -> Result:
+    node run:
+        s = llm(summarize, item)
+        return Result(output=s)
+"""
+            check(parser, src)  # should not raise

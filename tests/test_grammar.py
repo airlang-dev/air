@@ -174,6 +174,38 @@ class TestTransform:
         without_via = transforms[1]
         assert find_rule(without_via, "llm_call") is None
 
+    def test_transform_with_func(self, parser):
+        tree = parse(parser, load_fixture("transform"))
+        transforms = find_all_rules(tree, "transform_expr")
+        # Third transform (with_func node) uses func_call
+        with_func = transforms[2]
+        assert find_rule(with_func, "func_call") is not None
+        assert find_rule(with_func, "llm_call") is None
+
+
+class TestMapCall:
+
+    def test_map_parses(self, parser):
+        tree = parse(parser, load_fixture("map"))
+        assert find_rule(tree, "map_call") is not None
+
+    def test_map_with_modifiers(self, parser):
+        tree = parse(parser, load_fixture("map"))
+        assert find_rule(tree, "map_modifiers") is not None
+        assert find_rule(tree, "concurrency_modifier") is not None
+        assert find_rule(tree, "on_error_modifier") is not None
+
+    def test_map_without_modifiers(self, parser):
+        tree = parse(parser, load_fixture("map"))
+        map_calls = find_all_rules(tree, "map_call")
+        # First map call has no modifiers
+        assert find_rule(map_calls[0], "map_modifiers") is None
+
+    def test_map_multiple_workflows(self, parser):
+        tree = parse(parser, load_fixture("map"))
+        workflows = find_all_rules(tree, "workflow_decl")
+        assert len(workflows) == 2
+
 
 class TestVerify:
 

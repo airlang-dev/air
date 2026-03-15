@@ -106,6 +106,8 @@ class LangGraphBackend(Backend):
                     adapters.add("session_adapter")
                 elif op_type == "tool":
                     adapters.add("tool_adapter")
+                elif op_type == "map":
+                    adapters.add("map_adapter")
 
         if adapters:
             adapter_list = ", ".join(sorted(adapters))
@@ -260,6 +262,27 @@ class LangGraphBackend(Backend):
                 w.line(f'print(f\'[TRACE] op.end output={out} value="{{state["{out}"]}}"\')')
             else:
                 w.line(f'_ = "[TOOL:{tool_name}]"')
+
+        elif op_type == "map":
+            collection = inputs[0] if inputs else "[]"
+            wf = params.get("workflow", "Unknown")
+            concurrency = params.get("concurrency")
+            on_error = params.get("on_error")
+            mod_parts = []
+            if concurrency:
+                mod_parts.append(f"concurrency={concurrency}")
+            if on_error:
+                mod_parts.append(f'on_error="{on_error}"')
+            mod_str = ", ".join(mod_parts)
+            w.line(f'print("[TRACE] op.start type=map workflow={wf}")')
+            call_args = f'{self._resolve_input(collection, all_vars)}, "{wf}"'
+            if mod_str:
+                call_args += f", {mod_str}"
+            if out:
+                w.line(f'state["{out}"] = map_adapter({call_args})')
+                w.line(f'print(f\'[TRACE] op.end output={out} value="{{state["{out}"]}}"\')')
+            else:
+                w.line(f'map_adapter({call_args})')
 
         elif op_type == "construct":
             con_type = params.get("type")

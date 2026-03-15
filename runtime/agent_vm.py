@@ -1,7 +1,7 @@
 from runtime.adapters import (
     llm_adapter, transform_adapter, verify_adapter,
     decision_adapter, aggregate_adapter, gate_adapter,
-    session_adapter,
+    session_adapter, map_adapter,
 )
 
 
@@ -166,6 +166,17 @@ def _execute_operations(operations, state, node_id):
             if out_names:
                 _trace_op_end(out_names, value)
 
+        elif op_type == "map":
+            workflow = params.get("workflow", "Unknown")
+            collection = variables.get(inputs[0], []) if inputs else []
+            concurrency = params.get("concurrency", 1)
+            on_error = params.get("on_error", "halt")
+            value = map_adapter(collection, workflow,
+                                concurrency=concurrency, on_error=on_error)
+            _store(variables, out_names, value)
+            if out_names:
+                _trace_op_end(out_names, value)
+
         state["trace"].append({
             "node": node_id, "operation": op_type,
             "inputs": inputs, "outputs": out_names, "params": params,
@@ -197,6 +208,8 @@ def _trace_op_start(op_type, params, inputs):
         pass
     elif op_type == "tool":
         parts.append(f"name={params['name']}")
+    elif op_type == "map":
+        parts.append(f"workflow={params.get('workflow', 'Unknown')}")
     elif op_type == "return":
         parts.append(f"return_type={params.get('type', 'Result')}")
     elif op_type == "construct":

@@ -4,9 +4,9 @@ Converts a CFG (with v0.2 AST instructions) into an AIR Graph.
 """
 
 from air_ast import (
-    Assign, Constructor, Decide, DottedName, Gate, Identifier,
-    LLMCall, ListLiteral, NodeCall, Parallel, Return, Route,
-    Session, ToolCall, Transform, Verify, Aggregate,
+    Assign, Constructor, Decide, DottedName, FuncCall, Gate,
+    Identifier, LLMCall, ListLiteral, MapCall, NodeCall, Parallel,
+    Return, Route, Session, ToolCall, Transform, Verify, Aggregate,
     EnumPattern, TypePattern, ElsePattern, BoolPattern,
 )
 from cfg import CFG
@@ -129,11 +129,26 @@ def _convert_assign(inst: Assign) -> AirGraphOperation | None:
             target_type_str += "[]"
         params = {"target_type": target_type_str}
         if expr.via:
-            params["via"] = expr.via.prompt
+            if isinstance(expr.via, LLMCall):
+                params["via"] = expr.via.prompt
+            elif isinstance(expr.via, FuncCall):
+                params["via_func"] = expr.via.name
         return AirGraphOperation(
             type="transform",
             inputs=[_arg_to_str(expr.input)],
             outputs=_typed_outputs(raw, target_type_str),
+            params=params,
+        )
+    if isinstance(expr, MapCall):
+        params = {"workflow": expr.workflow}
+        if expr.concurrency is not None:
+            params["concurrency"] = expr.concurrency
+        if expr.on_error is not None:
+            params["on_error"] = expr.on_error
+        return AirGraphOperation(
+            type="map",
+            inputs=[_arg_to_str(expr.collection)],
+            outputs=_typed_outputs(raw, "list"),
             params=params,
         )
     if isinstance(expr, Verify):

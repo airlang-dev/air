@@ -1,0 +1,15 @@
+@air 0.2
+
+workflow Outer(items: Item[]) -> Result | Fault:
+    node process:
+        results = map(items, Inner)
+        return Result(data=results)
+
+    node process_with_opts:
+        results = map(items, Inner) [concurrency=10, on_error=skip]
+        return Result(data=results)
+
+workflow Inner(item: Item) -> Result | Fault:
+    node run:
+        summary = llm(summarize, item)
+        return Result(output=summary)

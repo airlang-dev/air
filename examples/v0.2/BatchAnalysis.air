@@ -1,0 +1,80 @@
+@air 0.2 [mode=strict]
+
+workflow AnalyzeArticle(article: Article) -> AnalysisResult | Fault:
+
+    node extract:
+        features = transform(article) as Features via func(extract_features)
+
+        route features:
+            Fault: abort
+            else: detect(article, features)
+
+    node detect(article, features):
+        parallel:
+            check_claude = llm(detect_ai_claude, article)
+            check_gpt = llm(detect_ai_gpt, article)
+
+        verdict, evidence = verify([check_claude, check_gpt], ai_detection_consistency)
+        outcome = gate(verdict)
+
+        route outcome:
+            PROCEED: score(features, evidence)
+            ESCALATE: score(features, evidence)
+            RETRY: detect(article, features)
+            HALT: abort
+
+    node score(features, evidence):
+        quality = llm(evaluate_quality, features)
+        assessment = transform(quality) as Score via llm(extract_score)
+
+        route assessment:
+            Fault: abort
+            else: done(features, evidence, assessment)
+
+    node done(features, evidence, assessment):
+        return AnalysisResult(features=features, ai_detection=evidence, quality_score=assessment)
+
+    node abort:
+        return Fault(reason="Analysis failed")
+
+workflow BatchAnalysis(articles: Article[]) -> Artifact | Fault:
+
+    node analyze:
+        results = map(articles, AnalyzeArticle) [concurrency=20, on_error=skip]
+
+        has_results = transform(results) as bool via func(is_nonempty)
+
+        route has_results:
+            true: compute(results)
+            false: abort
+
+    node compute(results):
+        stats = tool(compute_statistics, results)
+
+        route stats:
+            Fault: abort
+            else: report(results, stats)
+
+    node report(results, stats):
+        narrative = llm(generate_report, results, stats)
+        claims = transform(narrative) as Claim[] via llm(extract_claims)
+
+        route claims:
+            Fault: publish(results, stats, narrative)
+            else: validate(results, stats, narrative, claims)
+
+    node validate(results, stats, narrative, claims):
+        verdict, evidence = verify(claims, statistical_accuracy)
+        outcome = gate(verdict)
+
+        route outcome:
+            PROCEED: publish(results, stats, narrative)
+            ESCALATE: publish(results, stats, narrative)
+            RETRY: report(results, stats)
+            HALT: abort
+
+    node publish(results, stats, narrative):
+        return Artifact(analyses=results, statistics=stats, report=narrative)
+
+    node abort:
+        return Fault(reason="Pipeline failed")

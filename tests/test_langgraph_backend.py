@@ -106,6 +106,11 @@ class TestOperations:
         code = generate_code(parser, "transform")
         assert "transform_adapter" in code
 
+    def test_map_operation(self, parser):
+        code = generate_code(parser, "map")
+        assert "map_adapter" in code
+        assert "Inner" in code
+
     def test_return_operation(self, parser):
         code = generate_code(parser, "basic")
         assert "__result__" in code
@@ -214,6 +219,7 @@ class TestAllFixtures:
         "parallel",
         "return_fields",
         "list_assignment",
+        "map",
     ])
     def test_fixture_generates(self, parser, fixture):
         code = generate_code(parser, fixture)
@@ -232,6 +238,7 @@ class TestAllFixtures:
         "parallel",
         "return_fields",
         "list_assignment",
+        "map",
     ])
     def test_fixture_is_valid_python(self, parser, fixture):
         """Generated code should be syntactically valid Python."""

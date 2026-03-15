@@ -14,18 +14,21 @@ Validates:
 
 from air_ast import (
     Aggregate, Assign, Constructor, Decide, DottedName, ElsePattern,
-    EnumPattern, Gate, Identifier, LLMCall, ListLiteral, Node, NodeCall,
-    Parallel, Program, Return, Route, RouteCase, Session, ToolCall,
-    Transform, Unreachable, Verify, Workflow,
+    EnumPattern, FuncCall, Gate, Identifier, LLMCall, ListLiteral,
+    MapCall, Node, NodeCall, Parallel, Program, Return, Route,
+    RouteCase, Session, ToolCall, Transform, Unreachable, Verify,
+    Workflow,
 )
 
 OUTCOME_VALUES = {"PROCEED", "RETRY", "ESCALATE", "HALT"}
 
 RESERVED_KEYWORDS = {
     "llm", "tool", "transform", "verify", "aggregate",
-    "gate", "decide", "session", "route", "return",
-    "unreachable", "parallel",
+    "gate", "decide", "session", "map", "func",
+    "route", "return", "unreachable", "parallel",
 }
+
+VALID_ON_ERROR = {"halt", "skip", "collect"}
 
 
 class SemanticError(Exception):
@@ -34,11 +37,12 @@ class SemanticError(Exception):
 
 def check_program(program: Program):
     """Run all semantic checks on a program."""
+    workflow_names = {w.name for w in program.workflows}
     for workflow in program.workflows:
-        _check_workflow(workflow)
+        _check_workflow(workflow, workflow_names)
 
 
-def _check_workflow(workflow: Workflow):
+def _check_workflow(workflow: Workflow, workflow_names: set):
     node_names = set()
     fallback_count = 0
     return_type_names = {t.name for t in workflow.return_types}
@@ -70,17 +74,19 @@ def _check_workflow(workflow: Workflow):
 
     # Per-node checks
     for node in workflow.nodes:
-        _check_node(node, node_names, workflow_params, return_type_names)
+        _check_node(node, node_names, workflow_params, return_type_names,
+                     workflow_names)
 
 
 def _check_node(node: Node, node_names: set, workflow_params: set,
-                return_type_names: set):
+                return_type_names: set, workflow_names: set):
     # Variables in scope: workflow params + node params
     defined = set(workflow_params) | set(node.params)
 
     # Walk body statements
     for stmt in node.body:
-        _check_statement(stmt, defined, node_names, return_type_names)
+        _check_statement(stmt, defined, node_names, return_type_names,
+                         workflow_names)
 
     # 9. Termination check
     if not _terminates(node.body):
@@ -91,10 +97,10 @@ def _check_node(node: Node, node_names: set, workflow_params: set,
 
 
 def _check_statement(stmt, defined: set, node_names: set,
-                     return_type_names: set):
+                     return_type_names: set, workflow_names: set):
     if isinstance(stmt, Assign):
         # Check RHS references first
-        _check_expression_refs(stmt.value, defined)
+        _check_expression_refs(stmt.value, defined, workflow_names)
         # Then define LHS (SSA check)
         for target in stmt.targets:
             if target != "_":
@@ -105,7 +111,7 @@ def _check_statement(stmt, defined: set, node_names: set,
                 defined.add(target)
 
     elif isinstance(stmt, Return):
-        _check_expression_refs(stmt.value, defined)
+        _check_expression_refs(stmt.value, defined, workflow_names)
         # 8. Return type validity
         if isinstance(stmt.value, Constructor):
             if stmt.value.type_name not in return_type_names:
@@ -127,25 +133,27 @@ def _check_statement(stmt, defined: set, node_names: set,
             )
 
     elif isinstance(stmt, Parallel):
-        _check_parallel(stmt, defined, node_names, return_type_names)
+        _check_parallel(stmt, defined, node_names, return_type_names,
+                         workflow_names)
 
     elif isinstance(stmt, Unreachable):
         pass
 
     # Bare instruction calls (tool, llm, session without assignment)
     elif isinstance(stmt, (ToolCall, LLMCall, Session)):
-        _check_expression_refs(stmt, defined)
+        _check_expression_refs(stmt, defined, workflow_names)
 
 
 def _check_parallel(parallel: Parallel, defined: set, node_names: set,
-                    return_type_names: set):
+                    return_type_names: set, workflow_names: set):
     # Variables defined in parallel branches all merge into the outer scope.
     # But within the parallel block, SSA still applies — no two branches
     # can define the same variable.
     parallel_defined = set()
     for branch in parallel.branches:
         branch_defined = set(defined)
-        _check_statement(branch, branch_defined, node_names, return_type_names)
+        _check_statement(branch, branch_defined, node_names,
+                         return_type_names, workflow_names)
         # Collect newly defined variables
         new_vars = branch_defined - defined
         for var in new_vars:
@@ -199,7 +207,7 @@ def _check_route(route: Route, defined: set, node_names: set):
                 )
 
 
-def _check_expression_refs(expr, defined: set):
+def _check_expression_refs(expr, defined: set, workflow_names: set = None):
     """Check that all variable references in an expression are defined."""
     if isinstance(expr, Identifier):
         _check_var_ref(expr.name, defined)
@@ -223,7 +231,7 @@ def _check_expression_refs(expr, defined: set):
         for inp in expr.inputs:
             _check_arg_ref(inp, defined)
     elif isinstance(expr, Gate):
-        _check_expression_refs(expr.input, defined)
+        _check_expression_refs(expr.input, defined, workflow_names)
     elif isinstance(expr, Decide):
         # provider is an asset name — don't check it
         for arg in expr.args:
@@ -233,8 +241,22 @@ def _check_expression_refs(expr, defined: set):
             _check_arg_ref(arg, defined)
     elif isinstance(expr, Transform):
         _check_arg_ref(expr.input, defined)
-        if expr.via:
-            _check_expression_refs(expr.via, defined)
+        if expr.via and isinstance(expr.via, LLMCall):
+            _check_expression_refs(expr.via, defined, workflow_names)
+        # FuncCall: func name is an asset ref — don't check it
+    elif isinstance(expr, MapCall):
+        _check_arg_ref(expr.collection, defined)
+        # Validate workflow reference against same-file workflows
+        if workflow_names is not None and expr.workflow not in workflow_names:
+            raise SemanticError(
+                f"Unknown workflow '{expr.workflow}' in map"
+            )
+        # Validate on_error value
+        if expr.on_error is not None and expr.on_error not in VALID_ON_ERROR:
+            raise SemanticError(
+                f"Invalid on_error value '{expr.on_error}' in map "
+                f"(must be one of: {', '.join(sorted(VALID_ON_ERROR))})"
+            )
     elif isinstance(expr, Constructor):
         for val in expr.fields.values():
             if isinstance(val, Identifier):

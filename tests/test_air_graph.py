@@ -131,6 +131,34 @@ class TestOperations:
         assert "Claim[]" in ops[0].params.get("target_type", "")
         assert ops[0].params.get("via") == "extract_claims"
 
+    def test_transform_func_operation(self, parser):
+        graph = build_graph(parser, "transform")
+        node = next(n for n in graph.nodes if n.name == "with_func")
+        ops = [op for op in node.operations if op.type == "transform"]
+        assert len(ops) == 1
+        assert ops[0].params.get("target_type") == "Features"
+        assert ops[0].params.get("via_func") == "extract_features"
+        assert "via" not in ops[0].params
+
+    def test_map_operation(self, parser):
+        graph = build_graph(parser, "map")
+        node = next(n for n in graph.nodes if n.name == "process")
+        ops = [op for op in node.operations if op.type == "map"]
+        assert len(ops) == 1
+        assert ops[0].params["workflow"] == "Inner"
+        assert ops[0].inputs == ["items"]
+        assert "concurrency" not in ops[0].params
+        assert "on_error" not in ops[0].params
+
+    def test_map_operation_with_modifiers(self, parser):
+        graph = build_graph(parser, "map")
+        node = next(n for n in graph.nodes if n.name == "process_with_opts")
+        ops = [op for op in node.operations if op.type == "map"]
+        assert len(ops) == 1
+        assert ops[0].params["workflow"] == "Inner"
+        assert ops[0].params["concurrency"] == 10
+        assert ops[0].params["on_error"] == "skip"
+
     def test_return_operation(self, parser):
         graph = build_graph(parser, "basic")
         start = next(n for n in graph.nodes if n.name == "start")
@@ -241,6 +269,7 @@ class TestSchemaValidation:
         "parallel",
         "return_fields",
         "list_assignment",
+        "map",
     ])
     def test_fixture_validates(self, parser, fixture):
         data = build_and_serialize(parser, fixture)

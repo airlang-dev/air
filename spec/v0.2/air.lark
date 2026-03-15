@@ -76,6 +76,7 @@ expression: llm_call
           | decide_call
           | session_call
           | transform_expr
+          | map_call
           | constructor
           | list_literal
           | dotted_name
@@ -136,7 +137,24 @@ session_call: "session" "(" arg_list ")"
 // TRANSFORM
 // -----------------------------
 
-transform_expr: "transform" "(" arg ")" "as" type_name ("via" llm_call)?
+transform_expr: "transform" "(" arg ")" "as" type_name ("via" (llm_call | func_call))?
+
+// -----------------------------
+// MAP
+// -----------------------------
+
+map_call: "map" "(" arg "," IDENTIFIER ")" map_modifiers?
+
+map_modifiers: "[" map_modifier ("," map_modifier)* "]"
+
+map_modifier: "concurrency" "=" NUMBER    -> concurrency_modifier
+            | "on_error" "=" IDENTIFIER   -> on_error_modifier
+
+// -----------------------------
+// FUNC
+// -----------------------------
+
+func_call: "func" "(" IDENTIFIER ")"
 
 // -----------------------------
 // ROUTE

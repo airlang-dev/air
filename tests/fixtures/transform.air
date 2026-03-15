@@ -8,3 +8,7 @@ workflow W(summary: Message, text: Message) -> Artifact:
     node without_via:
         nums = transform(text) as Number[]
         return Artifact(data=nums)
+
+    node with_func:
+        features = transform(summary) as Features via func(extract_features)
+        return Artifact(data=features)

@@ -181,10 +181,15 @@ class ToolCall(Expression):
 
 
 @dataclass
+class FuncCall(Expression):
+    name: str
+
+
+@dataclass
 class Transform(Expression):
     input: Arg
     target_type: Type
-    via: Optional[LLMCall] = None
+    via: Optional[Union[LLMCall, "FuncCall"]] = None
 
 
 @dataclass
@@ -213,6 +218,14 @@ class Decide(Expression):
 @dataclass
 class Session(Expression):
     args: list[Arg] = field(default_factory=list)
+
+
+@dataclass
+class MapCall(Expression):
+    collection: Arg
+    workflow: str
+    concurrency: Optional[int] = None
+    on_error: Optional[str] = None
 
 
 @dataclass

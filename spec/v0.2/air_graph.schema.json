@@ -56,7 +56,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["llm", "transform", "verify", "aggregate", "gate", "decide", "session", "return", "tool", "construct"]
+          "enum": ["llm", "transform", "verify", "aggregate", "gate", "decide", "session", "return", "tool", "construct", "map"]
         },
         "inputs": {
           "type": "array",

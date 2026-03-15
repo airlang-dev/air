@@ -1,9 +1,10 @@
 from lark import Tree, Token
 from air_ast import (
     Aggregate, Assign, BoolPattern, Constructor, Decide, DottedName,
-    ElsePattern, EnumPattern, Gate, Identifier, LLMCall, ListLiteral,
-    Node, NodeCall, Parallel, Param, Program, Return, Route, RouteCase,
-    Session, ToolCall, Transform, Type, TypePattern, Unreachable, Verify,
+    ElsePattern, EnumPattern, FuncCall, Gate, Identifier, LLMCall,
+    ListLiteral, MapCall, Node, NodeCall, Parallel, Param, Program,
+    Return, Route, RouteCase, Session, ToolCall, Transform, Type,
+    TypePattern, Unreachable, Verify,
 )
 
 # Instruction keywords that are syntactically identical to node_call
@@ -211,6 +212,8 @@ class ASTBuilder:
             return self._build_session(node)
         if node.data == "transform_expr":
             return self._build_transform(node)
+        if node.data == "map_call":
+            return self._build_map_call(node)
         if node.data == "constructor":
             return self._build_constructor(node)
         if node.data == "list_literal":
@@ -280,8 +283,32 @@ class ASTBuilder:
                     target_type = self._build_type(child)
                 elif child.data == "llm_call":
                     via = self._build_llm_call(child)
+                elif child.data == "func_call":
+                    via = self._build_func_call(child)
 
         return Transform(input=input_arg, target_type=target_type, via=via)
+
+    def _build_func_call(self, node: Tree) -> FuncCall:
+        name = self._token_value(node.children[0])
+        return FuncCall(name=name)
+
+    def _build_map_call(self, node: Tree) -> MapCall:
+        collection = self._build_arg(node.children[0])
+        workflow = self._token_value(node.children[1])
+        concurrency = None
+        on_error = None
+
+        for child in node.children:
+            if isinstance(child, Tree):
+                if child.data == "map_modifiers":
+                    for mod in child.iter_subtrees():
+                        if mod.data == "concurrency_modifier":
+                            concurrency = int(self._token_value(mod.children[0]))
+                        elif mod.data == "on_error_modifier":
+                            on_error = self._token_value(mod.children[0])
+
+        return MapCall(collection=collection, workflow=workflow,
+                       concurrency=concurrency, on_error=on_error)
 
     # -------------------------------------------------
     # constructor

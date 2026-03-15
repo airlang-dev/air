@@ -4,9 +4,10 @@ import pytest
 
 from air_ast import (
     Aggregate, Assign, BoolPattern, Constructor, Decide, DottedName,
-    ElsePattern, EnumPattern, Gate, Identifier, LLMCall, ListLiteral,
-    Node, NodeCall, Parallel, Param, Program, Return, Route, RouteCase,
-    Session, ToolCall, Transform, Type, TypePattern, Unreachable, Verify,
+    ElsePattern, EnumPattern, FuncCall, Gate, Identifier, LLMCall,
+    ListLiteral, MapCall, Node, NodeCall, Parallel, Param, Program,
+    Return, Route, RouteCase, Session, ToolCall, Transform, Type,
+    TypePattern, Unreachable, Verify,
 )
 from ast_builder import ASTBuilder
 from helpers import load_fixture, build_fixture, find_node, EXAMPLES_DIR
@@ -161,6 +162,47 @@ class TestTransform:
         t = n.body[0].value
         assert isinstance(t, Transform)
         assert t.via is None
+
+    def test_transform_with_func(self, parser):
+        n = find_node(build_fixture(parser, "transform"), "with_func")
+        t = n.body[0].value
+        assert isinstance(t, Transform)
+        assert isinstance(t.via, FuncCall)
+        assert t.via.name == "extract_features"
+        assert t.target_type == Type("Features", is_list=False)
+
+
+# ---------------------------------------------------------------------------
+# Map
+# ---------------------------------------------------------------------------
+
+class TestMap:
+
+    def test_map_basic(self, parser):
+        prog = build_fixture(parser, "map")
+        n = find_node(prog, "process")
+        m = n.body[0].value
+        assert isinstance(m, MapCall)
+        assert m.collection == Identifier("items")
+        assert m.workflow == "Inner"
+        assert m.concurrency is None
+        assert m.on_error is None
+
+    def test_map_with_modifiers(self, parser):
+        prog = build_fixture(parser, "map")
+        n = find_node(prog, "process_with_opts")
+        m = n.body[0].value
+        assert isinstance(m, MapCall)
+        assert m.collection == Identifier("items")
+        assert m.workflow == "Inner"
+        assert m.concurrency == 10
+        assert m.on_error == "skip"
+
+    def test_map_multi_workflow(self, parser):
+        prog = build_fixture(parser, "map")
+        assert len(prog.workflows) == 2
+        assert prog.workflows[0].name == "Outer"
+        assert prog.workflows[1].name == "Inner"
 
 
 # ---------------------------------------------------------------------------
