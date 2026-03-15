@@ -295,7 +295,10 @@ Invokes a language model.
 
 ```air
 result = llm(prompt, input)
+result = llm(prompt, input1, input2, ...)
 ```
+
+The first argument is always a **prompt asset reference**. Remaining arguments are input data from the workflow.
 
 Example:
 
@@ -309,9 +312,76 @@ Return type:
 Message
 ```
 
-The prompt is an asset reference. The input is data from the workflow. The runtime implicitly provides model configuration and context.
+### Model Binding
 
-Transport failures (timeouts, rate limits) are handled by the runtime. AIR only observes the semantic output.
+The prompt asset determines which model executes the call. Each prompt asset may specify a `model` field that binds it to a specific LLM provider and model. If no model is specified, the runtime uses its default model.
+
+```yaml
+# prompts/summarize.yaml
+model: claude-sonnet
+template: summarize.md
+```
+
+AIR source never references models directly. Model selection is always mediated through prompt assets. This keeps AIR programs model-agnostic — the same workflow can target different models by changing prompt asset configuration, without modifying AIR source.
+
+### Cross-Model Patterns
+
+To run the same instructions on different models, create separate prompt assets that share a template but bind to different models.
+
+```yaml
+# prompts/detect_ai_claude.yaml
+model: claude-sonnet
+template: detect_ai_content.md
+
+# prompts/detect_ai_gpt.yaml
+model: gpt-4o
+template: detect_ai_content.md
+```
+
+The `template` field references a shared template file. This avoids duplicating prompt text when only the model differs.
+
+These prompt assets are then used in AIR source like any other:
+
+```air
+parallel:
+    check_claude = llm(detect_ai_claude, article)
+    check_gpt = llm(detect_ai_gpt, article)
+```
+
+Each call invokes the same prompt template on a different model. The results can be cross-checked:
+
+```air
+parallel:
+    check_claude = llm(detect_ai_claude, article)
+    check_gpt = llm(detect_ai_gpt, article)
+
+consensus = aggregate([check_claude, check_gpt], unanimous)
+```
+
+### Conversational Prompts
+
+In multi-turn patterns (Section 29), prompt assets like `claude`, `gpt`, `gemini` are conversational prompt assets — each specifies a model and a system prompt or persona:
+
+```yaml
+# prompts/claude.yaml
+model: claude-sonnet
+template: conversational_agent.md
+
+# prompts/gpt.yaml
+model: gpt-4o
+template: conversational_agent.md
+```
+
+The AIR source reads naturally as model names, but they are prompt assets:
+
+```air
+r1 = llm(claude, history)
+r2 = llm(gpt, [history, r1])
+```
+
+### Transport Failures
+
+Transport failures (timeouts, rate limits, provider outages) are handled by the runtime. AIR only observes the semantic output. The `llm` instruction never produces `Fault` — it is stochastic and always returns `Message`.
 
 ---
 
@@ -1012,7 +1082,22 @@ functions   — deterministic transform functions
 
 ### Prompt Assets
 
-Referenced by `llm()` and `transform() ... via llm()`. Contain prompt templates with optional variable interpolation.
+Referenced by `llm()` and `transform() ... via llm()`. A prompt asset configures an LLM invocation.
+
+A prompt asset may be a plain text file (the template itself) or a structured file with metadata:
+
+```yaml
+# prompts/summarize.yaml
+model: claude-sonnet          # optional — runtime default if omitted
+template: summarize.md        # references a shared template file
+```
+
+Fields:
+
+- **`model`** (optional): LLM provider and model identifier. If omitted, the runtime uses its configured default model.
+- **`template`**: The prompt template, either inline or as a reference to a `.md` file. Templates may use variable interpolation for input data.
+
+When multiple prompt assets need the same instructions but different models, they reference a shared template file. This avoids duplicating prompt text and makes model selection a configuration concern rather than a source concern.
 
 ### Rule Assets
 
@@ -1053,8 +1138,11 @@ project/
 ├── workflows/
 │   └── fact_check.air
 ├── prompts/
-│   ├── summarize.md
-│   └── extract_claims.md
+│   ├── summarize.md                 # plain template (uses runtime default model)
+│   ├── extract_claims.md
+│   ├── detect_ai_claude.yaml        # structured: model + shared template
+│   ├── detect_ai_gpt.yaml           # structured: model + shared template
+│   └── detect_ai_content.md         # shared template referenced by both
 ├── rules/
 │   ├── product_existence.rule
 │   └── style_guide.rule
