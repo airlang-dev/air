@@ -343,36 +343,58 @@ Tool faults follow standard fault precedence (see Section 20).
 
 # 11. Transform Instruction
 
-Performs deterministic type conversion.
+Converts a value into a target type. Three forms are supported, each with a different execution model.
+
+### Schema Coercion
 
 ```air
 value = transform(input) as TargetType
 ```
 
+The runtime attempts automatic type conversion using the target type's schema definition. Suitable for mechanical conversions where no interpretation is required.
+
 Example:
 
 ```air
 numbers = transform(text) as Number[]
-```
-
-The `as` keyword specifies the target type.
-
-### LLM-Assisted Transform
-
-When inference is required, transform may call an LLM.
-
-```air
-claims = transform(summary) as Claim[] via llm(extract_claims)
+config = transform(raw_json) as AppConfig
 ```
 
 Execution model:
 
 ```
-LLM extraction
+parse input against target schema
    ↓
-schema validation
+success → T
+failure → Fault
+```
+
+Type signature:
+
+```
+transform(input) as T → T | Fault
+```
+
+Schema coercion is deterministic. It never invokes an LLM. Conversion failures (malformed input, type mismatch, schema validation error) produce `Fault`.
+
+### LLM-Assisted Transform
+
+When interpretation or extraction is required, transform invokes an LLM with a prompt asset.
+
+```air
+claims = transform(summary) as Claim[] via llm(extract_claims)
+```
+
+The LLM generates output guided by the prompt. The runtime validates the output against the target type's schema. If validation fails, the runtime retries (bounded by runtime configuration). If retries are exhausted, the result is `Fault`.
+
+Execution model:
+
+```
+LLM extraction (guided by prompt asset)
    ↓
-success → Claim[]
+schema validation against T
+   ↓
+success → T
 failure → retry (bounded by runtime configuration)
    ↓
 retries exhausted → Fault
@@ -383,6 +405,53 @@ Type signature:
 ```
 transform(input) as T via llm(prompt) → T | Fault
 ```
+
+### Function-Assisted Transform
+
+When conversion requires domain logic but not LLM inference, transform invokes a function asset — a deterministic function registered with the project.
+
+```air
+features = transform(article) as Features via func(extract_features)
+```
+
+The function asset receives the input value, performs computation, and returns a value that the runtime validates against the target type's schema.
+
+Example — extracting structural features from a markdown article:
+
+```air
+features = transform(article) as Features via func(extract_features)
+```
+
+Where `extract_features` is a function asset in the project's `functions/` directory that parses the article and produces a `Features` struct (word count, heading count, code block count, link count, etc.).
+
+Execution model:
+
+```
+function execution (deterministic)
+   ↓
+schema validation against T
+   ↓
+success → T
+failure → Fault
+```
+
+Type signature:
+
+```
+transform(input) as T via func(function_asset) → T | Fault
+```
+
+Function-assisted transform is deterministic. It never invokes an LLM. The function asset is a named reference resolved at compile time (see Section 23). The runtime is responsible for loading and executing the function. Failures — exceptions raised by the function or schema validation errors — produce `Fault`.
+
+### Transform Summary
+
+| Form | Syntax | Execution | Use Case |
+|------|--------|-----------|----------|
+| Schema coercion | `transform(x) as T` | parse/coerce | Mechanical conversion (JSON→struct, string→number) |
+| LLM-assisted | `transform(x) as T via llm(p)` | LLM + validate | Extraction requiring interpretation |
+| Function-assisted | `transform(x) as T via func(f)` | function + validate | Domain logic without LLM (parsing, computation, formatting) |
+
+All three forms produce `T | Fault`. All three validate the result against the target type's schema.
 
 ---
 
@@ -938,7 +1007,34 @@ rules       — verification rules (including enforcement mode)
 schemas     — structured type definitions
 providers   — decision provider configurations
 protocols   — session interaction rules
+functions   — deterministic transform functions
 ```
+
+### Prompt Assets
+
+Referenced by `llm()` and `transform() ... via llm()`. Contain prompt templates with optional variable interpolation.
+
+### Rule Assets
+
+Referenced by `verify()`. Define verification criteria and optionally an enforcement mode.
+
+### Schema Assets
+
+Define structured types used in workflow signatures, transform targets, and collection type parameters.
+
+### Provider Assets
+
+Referenced by `decide()`. Configure decision providers (human review queues, automated escalation systems).
+
+### Protocol Assets
+
+Referenced by `session()`. Define interaction rules for multi-participant sessions.
+
+### Function Assets
+
+Referenced by `transform() ... via func()`. Contain deterministic functions that transform input values. Function assets are opaque to the compiler — it validates only that the referenced asset exists. The runtime is responsible for loading and executing the function.
+
+Function assets may be implemented in any language supported by the runtime (e.g., Python, JavaScript, WASM). The runtime must ensure that function execution is deterministic and side-effect-free.
 
 Example usage:
 
@@ -947,6 +1043,7 @@ llm(summarize, content)
 verify(claims, product_existence)
 decide(human_reviewer, summary)
 session(members, parley_v1, history)
+transform(article) as Features via func(extract_features)
 ```
 
 Example project structure:
@@ -962,11 +1059,14 @@ project/
 │   ├── product_existence.rule
 │   └── style_guide.rule
 ├── schemas/
-│   └── claim.schema.json
+│   ├── claim.schema.json
+│   └── features.schema.json
 ├── providers/
 │   └── human_reviewer.yaml
-└── protocols/
-    └── parley_v1.yaml
+├── protocols/
+│   └── parley_v1.yaml
+└── functions/
+    └── extract_features.py
 ```
 
 ---
@@ -1021,19 +1121,20 @@ Runtime context     → implicit, managed by runtime
 
 Instruction typing contracts:
 
-| Instruction       | Consumes                | Produces             |
-| ----------------- | ----------------------- | -------------------- |
-| llm               | prompt, input           | Message              |
-| tool              | tool_name, inputs       | Artifact \| Fault    |
-| transform         | input                   | T                    |
-| transform via llm | input, prompt           | T \| Fault           |
-| verify            | input, rule             | Verdict, Evidence    |
-| aggregate         | Verdict[], strategy     | Consensus            |
-| gate              | Verdict \| Consensus    | Outcome              |
-| decide            | provider, inputs        | Message?, Outcome    |
-| session           | members, protocol, history | result (Outcome + Message[]) |
-| route             | Outcome or union types  | control flow         |
-| return            | Artifact \| Fault       | terminator           |
+| Instruction        | Consumes                   | Produces                      |
+| ------------------ | -------------------------- | ----------------------------- |
+| llm                | prompt, input              | Message                       |
+| tool               | tool_name, inputs          | Artifact \| Fault             |
+| transform          | input                      | T \| Fault                    |
+| transform via llm  | input, prompt              | T \| Fault                    |
+| transform via func | input, function            | T \| Fault                    |
+| verify             | input, rule                | Verdict, Evidence             |
+| aggregate          | Verdict[], strategy        | Consensus                     |
+| gate               | Verdict \| Consensus       | Outcome                       |
+| decide             | provider, inputs           | Message?, Outcome             |
+| session            | members, protocol, history | result (Outcome + Message[]) |
+| route              | Outcome or union types     | control flow                  |
+| return             | Artifact \| Fault          | terminator                    |
 
 The compiler enforces these rules during static analysis.
 
