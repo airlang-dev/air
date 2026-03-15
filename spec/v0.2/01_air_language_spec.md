@@ -1047,21 +1047,125 @@ Stochastic operations do not expose transport failures to AIR.
 
 ---
 
-# 22. Structured Values
+# 22. Structured Values and Collections
 
-Lists:
+### Constructors
 
-```air
-[v1, v2, v3]
-updated = [history, r1, r2, r3]
-```
-
-Structured values:
+Structured values are constructed with named fields:
 
 ```air
 Artifact(status="verified", summary=summary, verification=outcome)
 Fault(reason="Verification failed")
 ```
+
+The type name must match a type in the workflow's return type declaration or a schema-defined type (Section 23). Fields may be string literals or variable references.
+
+### Array Types
+
+The syntax `T[]` denotes an array of type `T`. `T` may be any built-in type, any schema-defined type, or `Fault`.
+
+Valid array types:
+
+```
+Message[]       — array of LLM responses
+Claim[]         — array of schema-defined type
+Verdict[]       — array of verification results
+Evidence[]      — array of supporting evidence
+Article[]       — array of schema-defined input type
+Number[]        — array of numbers
+Fault[]         — array of faults (e.g., collected from partial failure)
+```
+
+Array types are valid in:
+
+- **Workflow input parameters**: `workflow Pipeline(articles: Article[]) -> Artifact`
+- **Node parameters**: `node process(items: Claim[]):`
+- **Transform targets**: `transform(text) as Number[]`
+- **Instruction return types**: `session` returns a result where `.history` is `Message[]`
+- **Aggregate inputs**: `aggregate([v1, v2, v3], majority)` operates on `Verdict[]`
+
+Nested arrays (`T[][]`) are not supported. AIR operates on flat collections. If a workflow needs nested structure, use a schema-defined type that contains an array field.
+
+### Collection Literals
+
+Square brackets construct a collection:
+
+```air
+[v1, v2, v3]
+```
+
+Collection literals may appear in:
+
+- **Assignment**: `updated = [history, r1, r2, r3]`
+- **Instruction arguments**: `aggregate([v1, v2, v3], majority)`
+- **LLM input**: `llm(gpt, [history, r1])`
+
+### Concatenation Semantics
+
+When a collection literal contains a mix of arrays and single values, the result is a **flat concatenation** — array elements are spread, single values are appended.
+
+```air
+// history is Message[], r1/r2/r3 are Message
+updated = [history, r1, r2, r3]
+// result: Message[] containing all elements of history followed by r1, r2, r3
+```
+
+This is always flattening concatenation, never nesting. The result type is `T[]` where `T` is the element type of the array operands (or the type of the scalar operands). All operands must be type-compatible — mixing `Message` and `Verdict` in a single literal is a type error.
+
+Concatenation examples:
+
+```
+[a, b, c]           — creates T[] from three T values
+[list, item]         — appends item to list (flat)
+[list1, list2]       — concatenates two lists (flat)
+[list, a, b]         — appends a and b to list (flat)
+```
+
+### Empty Collections
+
+An empty collection is expressed with empty brackets:
+
+```air
+results = []
+```
+
+The type of an empty collection is inferred from context (the variable's usage in subsequent instructions). An empty collection may be used as an initial value before a `map` operation (Section TBD) or as a base case.
+
+### Routing on Collections
+
+Collections may be used as route values. Type-based routing distinguishes collections from scalar values:
+
+```air
+route claims:
+    Fault: handle_error
+    else: process(claims)
+```
+
+Here `claims` is either `Claim[]` (success) or `Fault` (failure). The type-based route dispatches accordingly.
+
+Routing on collection emptiness is not directly supported. To branch on whether a collection is empty, use a `transform` to convert to a boolean or a type that can be routed on:
+
+```air
+has_items = transform(results) as bool via func(is_nonempty)
+route has_items:
+    true: process(results)
+    false: handle_empty
+```
+
+### Collections and Instructions
+
+How each instruction interacts with collections:
+
+| Instruction | Collection behavior |
+|-------------|-------------------|
+| `llm` | May receive `T[]` as input (e.g., conversation history) |
+| `tool` | May receive or return `T[]` |
+| `transform` | May target `T[]` (e.g., `transform(text) as Claim[]`) |
+| `verify` | Receives single input, returns single `Verdict` + `Evidence` |
+| `aggregate` | Receives `Verdict[]` (via literal `[v1, v2, v3]`), returns `Consensus` |
+| `gate` | Receives single `Verdict` or `Consensus`, returns `Outcome` |
+| `session` | Returns result containing `Message[]` in `.history` |
+| `return` | May return a value containing `T[]` fields |
 
 ---
 
@@ -1225,6 +1329,10 @@ Instruction typing contracts:
 | return             | Artifact \| Fault          | terminator                    |
 
 The compiler enforces these rules during static analysis.
+
+`T` in `transform` rows may be a scalar type or an array type (`T[]`). See Section 22 for collection semantics.
+
+`Verdict[]` in the `aggregate` row is constructed from a collection literal (e.g., `[v1, v2, v3]`) — see Section 22 for concatenation rules.
 
 ---
 
