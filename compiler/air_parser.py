@@ -21,6 +21,7 @@ class AirIndenter(Indenter):
       same-level: NL only
       DEDENT:     DEDENT(s) then NL  (NL available at outer level)
     """
+
     NL_type = "_NL"
     OPEN_PAREN_types = []
     CLOSE_PAREN_types = []
@@ -32,8 +33,8 @@ class AirIndenter(Indenter):
         if self.paren_level > 0:
             return
 
-        indent_str = token.rsplit('\n', 1)[1]
-        indent = indent_str.count(' ') + indent_str.count('\t') * self.tab_len
+        indent_str = token.rsplit("\n", 1)[1]
+        indent = indent_str.count(" ") + indent_str.count("\t") * self.tab_len
 
         if indent > self.indent_level[-1]:
             self.indent_level.append(indent)
@@ -45,8 +46,9 @@ class AirIndenter(Indenter):
                 yield Token.new_borrow_pos(self.DEDENT_type, indent_str, token)
             if indent != self.indent_level[-1]:
                 from lark.indenter import DedentError
+
                 raise DedentError(
-                    'Unexpected dedent to column %s. Expected dedent to %s'
+                    "Unexpected dedent to column %s. Expected dedent to %s"
                     % (indent, self.indent_level[-1])
                 )
             yield token

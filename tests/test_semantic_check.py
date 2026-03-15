@@ -36,26 +36,30 @@ def check_fixture(parser, name: str):
 # Valid programs — should pass all checks
 # ---------------------------------------------------------------------------
 
+
 class TestValidPrograms:
 
-    @pytest.mark.parametrize("fixture", [
-        "basic",
-        "basic_strict",
-        "workflow_params",
-        "workflow_no_params",
-        "nodes",
-        "llm",
-        "tool",
-        "transform",
-        "governance",
-        "decide_session",
-        "parallel",
-        "transition",
-        "return_fields",
-        "list_assignment",
-        "route",
-        "map",
-    ])
+    @pytest.mark.parametrize(
+        "fixture",
+        [
+            "basic",
+            "basic_strict",
+            "workflow_params",
+            "workflow_no_params",
+            "nodes",
+            "llm",
+            "tool",
+            "transform",
+            "governance",
+            "decide_session",
+            "parallel",
+            "transition",
+            "return_fields",
+            "list_assignment",
+            "route",
+            "map",
+        ],
+    )
     def test_fixture_passes(self, parser, fixture):
         check_fixture(parser, fixture)
 
@@ -63,6 +67,7 @@ class TestValidPrograms:
 # ---------------------------------------------------------------------------
 # Node name uniqueness
 # ---------------------------------------------------------------------------
+
 
 class TestNodeNameUniqueness:
 
@@ -85,16 +90,32 @@ workflow W -> Artifact:
 # Node names vs keywords
 # ---------------------------------------------------------------------------
 
+
 class TestNodeNameKeywords:
 
-    @pytest.mark.parametrize("keyword", [
-        "llm", "tool", "session", "route", "return",
-        "unreachable", "parallel", "verify", "aggregate",
-        "gate", "decide", "transform", "map", "func",
-    ])
+    @pytest.mark.parametrize(
+        "keyword",
+        [
+            "llm",
+            "tool",
+            "session",
+            "route",
+            "return",
+            "unreachable",
+            "parallel",
+            "verify",
+            "aggregate",
+            "gate",
+            "decide",
+            "transform",
+            "map",
+            "func",
+        ],
+    )
     def test_grammar_prevents_keyword_node_name(self, parser, keyword):
         """Instruction keywords can't be used as node names (grammar rejects)."""
         from lark import UnexpectedInput
+
         src = f"""
 @air 0.2
 
@@ -109,6 +130,7 @@ workflow W -> Artifact:
 # ---------------------------------------------------------------------------
 # SSA violations
 # ---------------------------------------------------------------------------
+
 
 class TestSSA:
 
@@ -173,6 +195,7 @@ workflow W(claims: Claim[]) -> Artifact:
 # Variable existence
 # ---------------------------------------------------------------------------
 
+
 class TestVariableExistence:
 
     def test_undefined_variable(self, parser):
@@ -233,6 +256,7 @@ workflow W(input: Message) -> Artifact:
 # Route target existence
 # ---------------------------------------------------------------------------
 
+
 class TestRouteTargets:
 
     def test_unknown_route_target(self, parser):
@@ -268,6 +292,7 @@ workflow W(data: Message) -> Artifact:
 # ---------------------------------------------------------------------------
 # Route exhaustiveness
 # ---------------------------------------------------------------------------
+
 
 class TestRouteExhaustiveness:
 
@@ -340,6 +365,7 @@ workflow W(verdict: Verdict) -> Artifact | Fault:
 # Fallback node
 # ---------------------------------------------------------------------------
 
+
 class TestFallbackNode:
 
     def test_multiple_fallback_nodes(self, parser):
@@ -377,6 +403,7 @@ workflow W -> Artifact | Fault:
 # Return type validity
 # ---------------------------------------------------------------------------
 
+
 class TestReturnTypes:
 
     def test_return_undeclared_type(self, parser):
@@ -404,6 +431,7 @@ workflow W -> Artifact | Fault:
 # ---------------------------------------------------------------------------
 # Node termination
 # ---------------------------------------------------------------------------
+
 
 class TestNodeTermination:
 
@@ -460,6 +488,7 @@ workflow W(data: Message) -> Artifact:
 # ---------------------------------------------------------------------------
 # Map instruction
 # ---------------------------------------------------------------------------
+
 
 class TestMap:
 

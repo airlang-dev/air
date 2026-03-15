@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Optional, Union
 
-
 # -----------------------------
 # Types
 # -----------------------------
@@ -21,12 +20,14 @@ class Type:
 @dataclass
 class Identifier:
     """A bare name: summary, claims, Fault."""
+
     name: str
 
 
 @dataclass
 class DottedName:
     """A dotted access: result.consensus, Fault.reason."""
+
     object: str
     attribute: str
 
@@ -34,6 +35,7 @@ class DottedName:
 @dataclass
 class ListLiteral:
     """A list expression: [history, r1, r2]."""
+
     items: list["Arg"]
 
 
@@ -53,6 +55,7 @@ Value = Union[Identifier, DottedName, str, ListLiteral]
 @dataclass
 class Param:
     """Workflow input parameter: name: Type."""
+
     name: str
     type: Type
 
@@ -105,6 +108,7 @@ class Route(Instruction):
 @dataclass
 class NodeCall(Instruction):
     """Unconditional transition: validate(claims, summary)."""
+
     name: str
     args: list[Arg] = field(default_factory=list)
 

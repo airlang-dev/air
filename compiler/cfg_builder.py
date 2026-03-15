@@ -5,9 +5,20 @@ Each workflow Node becomes a CFGNode. Edges come from routes and node calls.
 """
 
 from air_ast import (
-    Workflow, Node, Route, Return, NodeCall, Parallel, Unreachable,
-    EnumPattern, TypePattern, ElsePattern, BoolPattern,
-    LLMCall, ToolCall, Session,
+    Workflow,
+    Node,
+    Route,
+    Return,
+    NodeCall,
+    Parallel,
+    Unreachable,
+    EnumPattern,
+    TypePattern,
+    ElsePattern,
+    BoolPattern,
+    LLMCall,
+    ToolCall,
+    Session,
 )
 from cfg import CFG, CFGNode, CFGEdge
 
@@ -31,15 +42,19 @@ def _collect_edges(body: list) -> list[CFGEdge]:
         if isinstance(inst, Route):
             for case in inst.cases:
                 if isinstance(case.target, str):
-                    edges.append(CFGEdge(
-                        target=case.target,
-                        condition=_pattern_str(case.pattern),
-                    ))
+                    edges.append(
+                        CFGEdge(
+                            target=case.target,
+                            condition=_pattern_str(case.pattern),
+                        )
+                    )
                 elif isinstance(case.target, NodeCall):
-                    edges.append(CFGEdge(
-                        target=case.target.name,
-                        condition=_pattern_str(case.pattern),
-                    ))
+                    edges.append(
+                        CFGEdge(
+                            target=case.target.name,
+                            condition=_pattern_str(case.pattern),
+                        )
+                    )
                 elif isinstance(case.target, Return):
                     # Inline return — no edge, handled by _has_return
                     pass

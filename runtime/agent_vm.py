@@ -1,7 +1,12 @@
 from runtime.adapters import (
-    llm_adapter, transform_adapter, verify_adapter,
-    decision_adapter, aggregate_adapter, gate_adapter,
-    session_adapter, map_adapter,
+    llm_adapter,
+    transform_adapter,
+    verify_adapter,
+    decision_adapter,
+    aggregate_adapter,
+    gate_adapter,
+    session_adapter,
+    map_adapter,
 )
 
 
@@ -126,25 +131,40 @@ def _execute_operations(operations, state, node_id):
                 ret_type = params.get("type", "Result")
                 resolved = {k: variables.get(v, v) for k, v in fields.items()}
                 print(f"[TRACE] return type={ret_type}")
-                state["trace"].append({
-                    "node": node_id, "operation": op_type,
-                    "inputs": inputs, "outputs": out_names, "params": params,
-                })
+                state["trace"].append(
+                    {
+                        "node": node_id,
+                        "operation": op_type,
+                        "inputs": inputs,
+                        "outputs": out_names,
+                        "params": params,
+                    }
+                )
                 return {"type": ret_type, "fields": resolved}
             elif inputs:
                 value = variables.get(inputs[0], inputs[0])
                 print(f"[TRACE] return value={value}")
-                state["trace"].append({
-                    "node": node_id, "operation": op_type,
-                    "inputs": inputs, "outputs": out_names, "params": params,
-                })
+                state["trace"].append(
+                    {
+                        "node": node_id,
+                        "operation": op_type,
+                        "inputs": inputs,
+                        "outputs": out_names,
+                        "params": params,
+                    }
+                )
                 return value
             else:
                 print("[TRACE] return")
-                state["trace"].append({
-                    "node": node_id, "operation": op_type,
-                    "inputs": inputs, "outputs": out_names, "params": params,
-                })
+                state["trace"].append(
+                    {
+                        "node": node_id,
+                        "operation": op_type,
+                        "inputs": inputs,
+                        "outputs": out_names,
+                        "params": params,
+                    }
+                )
                 return None
 
         elif op_type == "construct":
@@ -171,16 +191,22 @@ def _execute_operations(operations, state, node_id):
             collection = variables.get(inputs[0], []) if inputs else []
             concurrency = params.get("concurrency", 1)
             on_error = params.get("on_error", "halt")
-            value = map_adapter(collection, workflow,
-                                concurrency=concurrency, on_error=on_error)
+            value = map_adapter(
+                collection, workflow, concurrency=concurrency, on_error=on_error
+            )
             _store(variables, out_names, value)
             if out_names:
                 _trace_op_end(out_names, value)
 
-        state["trace"].append({
-            "node": node_id, "operation": op_type,
-            "inputs": inputs, "outputs": out_names, "params": params,
-        })
+        state["trace"].append(
+            {
+                "node": node_id,
+                "operation": op_type,
+                "inputs": inputs,
+                "outputs": out_names,
+                "params": params,
+            }
+        )
 
     return None
 

@@ -16,6 +16,7 @@ def build_cfg_from_src(parser, src: str) -> CFG:
 
 def build_cfg_from_fixture(parser, name: str) -> CFG:
     from helpers import build_fixture
+
     program = build_fixture(parser, name)
     return build_cfg(program.workflows[0])
 
@@ -23,6 +24,7 @@ def build_cfg_from_fixture(parser, name: str) -> CFG:
 # ---------------------------------------------------------------------------
 # Basic structure
 # ---------------------------------------------------------------------------
+
 
 class TestBasicStructure:
 
@@ -41,13 +43,18 @@ class TestBasicStructure:
     def test_all_nodes_present(self, parser):
         cfg = build_cfg_from_fixture(parser, "nodes")
         assert set(cfg.nodes.keys()) == {
-            "start", "publish", "retry", "discuss", "recovery"
+            "start",
+            "publish",
+            "retry",
+            "discuss",
+            "recovery",
         }
 
 
 # ---------------------------------------------------------------------------
 # Edges from node calls (unconditional transitions)
 # ---------------------------------------------------------------------------
+
 
 class TestNodeCallEdges:
 
@@ -69,6 +76,7 @@ class TestNodeCallEdges:
 # ---------------------------------------------------------------------------
 # Edges from routes
 # ---------------------------------------------------------------------------
+
 
 class TestRouteEdges:
 
@@ -129,6 +137,7 @@ class TestRouteEdges:
 # Terminal nodes
 # ---------------------------------------------------------------------------
 
+
 class TestTerminalNodes:
 
     def test_return_is_terminal(self, parser):
@@ -148,6 +157,7 @@ class TestTerminalNodes:
 # Parallel blocks
 # ---------------------------------------------------------------------------
 
+
 class TestParallelCFG:
 
     def test_parallel_no_extra_edges(self, parser):
@@ -161,6 +171,7 @@ class TestParallelCFG:
 # ---------------------------------------------------------------------------
 # Reachability
 # ---------------------------------------------------------------------------
+
 
 class TestReachability:
 
@@ -185,6 +196,7 @@ workflow W -> Artifact:
 # Edge target validation
 # ---------------------------------------------------------------------------
 
+
 class TestEdgeValidation:
 
     def test_all_edge_targets_exist(self, parser):
@@ -193,5 +205,6 @@ class TestEdgeValidation:
             cfg = build_cfg_from_fixture(parser, name)
             for label, node in cfg.nodes.items():
                 for edge in node.edges:
-                    assert edge.target in cfg.nodes, \
-                        f"Edge from {label} to unknown {edge.target}"
+                    assert (
+                        edge.target in cfg.nodes
+                    ), f"Edge from {label} to unknown {edge.target}"

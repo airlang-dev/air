@@ -9,11 +9,17 @@ def main():
     parser = argparse.ArgumentParser(prog="air", description="AIR compiler")
     sub = parser.add_subparsers(dest="command")
 
-    compile_p = sub.add_parser("compile", help="Compile AIR source to AIR Graph (.airc)")
+    compile_p = sub.add_parser(
+        "compile", help="Compile AIR source to AIR Graph (.airc)"
+    )
     compile_p.add_argument("file", help="Path to .air source file")
-    compile_p.add_argument("--output", "-o", help="Output path (default: build/<name>.airc)")
+    compile_p.add_argument(
+        "--output", "-o", help="Output path (default: build/<name>.airc)"
+    )
 
-    backend_p = sub.add_parser("backend", help="Generate backend artifact from AIR Graph")
+    backend_p = sub.add_parser(
+        "backend", help="Generate backend artifact from AIR Graph"
+    )
     backend_p.add_argument("backend_name", help="Backend name (e.g. langgraph)")
     backend_p.add_argument("air_graph_file", help="Path to AIR Graph (.airc) file")
     backend_p.add_argument("--output", "-o", help="Output path")

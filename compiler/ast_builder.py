@@ -1,10 +1,34 @@
 from lark import Tree, Token
 from air_ast import (
-    Aggregate, Assign, BoolPattern, Constructor, Decide, DottedName,
-    ElsePattern, EnumPattern, FuncCall, Gate, Identifier, LLMCall,
-    ListLiteral, MapCall, Node, NodeCall, Parallel, Param, Program,
-    Return, Route, RouteCase, Session, ToolCall, Transform, Type,
-    TypePattern, Unreachable, Verify,
+    Aggregate,
+    Assign,
+    BoolPattern,
+    Constructor,
+    Decide,
+    DottedName,
+    ElsePattern,
+    EnumPattern,
+    FuncCall,
+    Gate,
+    Identifier,
+    LLMCall,
+    ListLiteral,
+    MapCall,
+    Node,
+    NodeCall,
+    Parallel,
+    Param,
+    Program,
+    Return,
+    Route,
+    RouteCase,
+    Session,
+    ToolCall,
+    Transform,
+    Type,
+    TypePattern,
+    Unreachable,
+    Verify,
 )
 
 # Instruction keywords that are syntactically identical to node_call
@@ -12,12 +36,19 @@ from air_ast import (
 INSTRUCTION_KEYWORDS = {"tool", "llm", "session"}
 
 # Known type names for pattern disambiguation
-TYPE_NAMES = {"Message", "Artifact", "Fault", "Verdict", "Consensus",
-              "Outcome", "Evidence", "Claim"}
+TYPE_NAMES = {
+    "Message",
+    "Artifact",
+    "Fault",
+    "Verdict",
+    "Consensus",
+    "Outcome",
+    "Evidence",
+    "Claim",
+}
 
 # Known enum values for pattern disambiguation
-ENUM_VALUES = {"PROCEED", "RETRY", "ESCALATE", "HALT",
-               "PASS", "FAIL", "UNCERTAIN"}
+ENUM_VALUES = {"PROCEED", "RETRY", "ESCALATE", "HALT", "PASS", "FAIL", "UNCERTAIN"}
 
 
 class ASTBuilder:
@@ -71,8 +102,9 @@ class ASTBuilder:
                 elif child.data == "node_decl":
                     nodes.append(self._build_node(child))
 
-        return Workflow(name=name, params=params,
-                        return_types=return_types, nodes=nodes)
+        return Workflow(
+            name=name, params=params, return_types=return_types, nodes=nodes
+        )
 
     def _build_workflow_params(self, node: Tree) -> list[Param]:
         params = []
@@ -119,8 +151,13 @@ class ASTBuilder:
                     if instr is not None:
                         body.append(instr)
 
-        return Node(name=name, params=params, max_visits=max_visits,
-                    is_fallback=is_fallback, body=body)
+        return Node(
+            name=name,
+            params=params,
+            max_visits=max_visits,
+            is_fallback=is_fallback,
+            body=body,
+        )
 
     def _build_identifier_list(self, node: Tree) -> list[str]:
         result = []
@@ -158,8 +195,9 @@ class ASTBuilder:
         lvalue = node.children[0]
         expr_node = node.children[1]
 
-        targets = [self._token_value(tok) for tok in lvalue.children
-                    if isinstance(tok, Token)]
+        targets = [
+            self._token_value(tok) for tok in lvalue.children if isinstance(tok, Token)
+        ]
 
         value = self._build_expression(expr_node)
         return Assign(targets=targets, value=value)
@@ -230,7 +268,9 @@ class ASTBuilder:
     def _build_llm_call(self, node: Tree) -> LLMCall:
         args = self._build_arg_list(node)
         prompt_arg = args[0] if args else None
-        prompt = prompt_arg.name if isinstance(prompt_arg, Identifier) else str(prompt_arg)
+        prompt = (
+            prompt_arg.name if isinstance(prompt_arg, Identifier) else str(prompt_arg)
+        )
         return LLMCall(prompt=prompt, args=args[1:])
 
     def _build_tool_call(self, node: Tree) -> ToolCall:
@@ -265,7 +305,11 @@ class ASTBuilder:
     def _build_decide(self, node: Tree) -> Decide:
         args = self._build_arg_list(node)
         provider_arg = args[0] if args else None
-        provider = provider_arg.name if isinstance(provider_arg, Identifier) else str(provider_arg)
+        provider = (
+            provider_arg.name
+            if isinstance(provider_arg, Identifier)
+            else str(provider_arg)
+        )
         return Decide(provider=provider, args=args[1:])
 
     def _build_session(self, node: Tree) -> Session:
@@ -307,8 +351,12 @@ class ASTBuilder:
                         elif mod.data == "on_error_modifier":
                             on_error = self._token_value(mod.children[0])
 
-        return MapCall(collection=collection, workflow=workflow,
-                       concurrency=concurrency, on_error=on_error)
+        return MapCall(
+            collection=collection,
+            workflow=workflow,
+            concurrency=concurrency,
+            on_error=on_error,
+        )
 
     # -------------------------------------------------
     # constructor
@@ -497,8 +545,7 @@ class ASTBuilder:
     def _build_type(self, node: Tree) -> Type:
         name = node.children[0].value
         is_list = any(
-            isinstance(c, Tree) and c.data == "array_suffix"
-            for c in node.children[1:]
+            isinstance(c, Tree) and c.data == "array_suffix" for c in node.children[1:]
         )
         return Type(name=name, is_list=is_list)
 

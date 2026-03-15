@@ -25,6 +25,7 @@ def generate_code(parser, fixture_name: str) -> str:
 # Basic code generation
 # ---------------------------------------------------------------------------
 
+
 class TestBasicGeneration:
 
     def test_produces_string(self, parser):
@@ -58,6 +59,7 @@ class TestBasicGeneration:
 # ---------------------------------------------------------------------------
 # Operations
 # ---------------------------------------------------------------------------
+
 
 class TestOperations:
 
@@ -134,6 +136,7 @@ class TestOperations:
 # Edges and routing
 # ---------------------------------------------------------------------------
 
+
 class TestEdges:
 
     def test_unconditional_edge(self, parser):
@@ -186,6 +189,7 @@ class TestEdges:
 # Trace logging
 # ---------------------------------------------------------------------------
 
+
 class TestTracing:
 
     def test_node_enter_trace(self, parser):
@@ -205,41 +209,48 @@ class TestTracing:
 # All fixtures compile without error
 # ---------------------------------------------------------------------------
 
+
 class TestAllFixtures:
 
-    @pytest.mark.parametrize("fixture", [
-        "basic",
-        "transition",
-        "llm",
-        "tool",
-        "transform",
-        "governance",
-        "decide_session",
-        "route",
-        "parallel",
-        "return_fields",
-        "list_assignment",
-        "map",
-    ])
+    @pytest.mark.parametrize(
+        "fixture",
+        [
+            "basic",
+            "transition",
+            "llm",
+            "tool",
+            "transform",
+            "governance",
+            "decide_session",
+            "route",
+            "parallel",
+            "return_fields",
+            "list_assignment",
+            "map",
+        ],
+    )
     def test_fixture_generates(self, parser, fixture):
         code = generate_code(parser, fixture)
         assert isinstance(code, str)
         assert "StateGraph" in code
 
-    @pytest.mark.parametrize("fixture", [
-        "basic",
-        "transition",
-        "llm",
-        "tool",
-        "transform",
-        "governance",
-        "decide_session",
-        "route",
-        "parallel",
-        "return_fields",
-        "list_assignment",
-        "map",
-    ])
+    @pytest.mark.parametrize(
+        "fixture",
+        [
+            "basic",
+            "transition",
+            "llm",
+            "tool",
+            "transform",
+            "governance",
+            "decide_session",
+            "route",
+            "parallel",
+            "return_fields",
+            "list_assignment",
+            "map",
+        ],
+    )
     def test_fixture_is_valid_python(self, parser, fixture):
         """Generated code should be syntactically valid Python."""
         code = generate_code(parser, fixture)

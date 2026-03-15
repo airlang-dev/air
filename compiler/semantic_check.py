@@ -13,19 +13,51 @@ Validates:
 """
 
 from air_ast import (
-    Aggregate, Assign, Constructor, Decide, DottedName, ElsePattern,
-    EnumPattern, FuncCall, Gate, Identifier, LLMCall, ListLiteral,
-    MapCall, Node, NodeCall, Parallel, Program, Return, Route,
-    RouteCase, Session, ToolCall, Transform, Unreachable, Verify,
+    Aggregate,
+    Assign,
+    Constructor,
+    Decide,
+    DottedName,
+    ElsePattern,
+    EnumPattern,
+    FuncCall,
+    Gate,
+    Identifier,
+    LLMCall,
+    ListLiteral,
+    MapCall,
+    Node,
+    NodeCall,
+    Parallel,
+    Program,
+    Return,
+    Route,
+    RouteCase,
+    Session,
+    ToolCall,
+    Transform,
+    Unreachable,
+    Verify,
     Workflow,
 )
 
 OUTCOME_VALUES = {"PROCEED", "RETRY", "ESCALATE", "HALT"}
 
 RESERVED_KEYWORDS = {
-    "llm", "tool", "transform", "verify", "aggregate",
-    "gate", "decide", "session", "map", "func",
-    "route", "return", "unreachable", "parallel",
+    "llm",
+    "tool",
+    "transform",
+    "verify",
+    "aggregate",
+    "gate",
+    "decide",
+    "session",
+    "map",
+    "func",
+    "route",
+    "return",
+    "unreachable",
+    "parallel",
 }
 
 VALID_ON_ERROR = {"halt", "skip", "collect"}
@@ -59,34 +91,35 @@ def _check_workflow(workflow: Workflow, workflow_names: set):
         node_names.add(node.name)
 
         if node.name in RESERVED_KEYWORDS:
-            raise SemanticError(
-                f"Node name '{node.name}' is a reserved keyword"
-            )
+            raise SemanticError(f"Node name '{node.name}' is a reserved keyword")
 
         if node.is_fallback:
             fallback_count += 1
 
     # 7. At most one fallback
     if fallback_count > 1:
-        raise SemanticError(
-            f"Multiple fallback nodes in workflow '{workflow.name}'"
-        )
+        raise SemanticError(f"Multiple fallback nodes in workflow '{workflow.name}'")
 
     # Per-node checks
     for node in workflow.nodes:
-        _check_node(node, node_names, workflow_params, return_type_names,
-                     workflow_names)
+        _check_node(
+            node, node_names, workflow_params, return_type_names, workflow_names
+        )
 
 
-def _check_node(node: Node, node_names: set, workflow_params: set,
-                return_type_names: set, workflow_names: set):
+def _check_node(
+    node: Node,
+    node_names: set,
+    workflow_params: set,
+    return_type_names: set,
+    workflow_names: set,
+):
     # Variables in scope: workflow params + node params
     defined = set(workflow_params) | set(node.params)
 
     # Walk body statements
     for stmt in node.body:
-        _check_statement(stmt, defined, node_names, return_type_names,
-                         workflow_names)
+        _check_statement(stmt, defined, node_names, return_type_names, workflow_names)
 
     # 9. Termination check
     if not _terminates(node.body):
@@ -96,8 +129,9 @@ def _check_node(node: Node, node_names: set, workflow_params: set,
         )
 
 
-def _check_statement(stmt, defined: set, node_names: set,
-                     return_type_names: set, workflow_names: set):
+def _check_statement(
+    stmt, defined: set, node_names: set, return_type_names: set, workflow_names: set
+):
     if isinstance(stmt, Assign):
         # Check RHS references first
         _check_expression_refs(stmt.value, defined, workflow_names)
@@ -128,13 +162,10 @@ def _check_statement(stmt, defined: set, node_names: set,
         _check_args_refs(stmt.args, defined)
         # 5. Target must be a known node
         if stmt.name not in node_names:
-            raise SemanticError(
-                f"Unknown node '{stmt.name}' in node call"
-            )
+            raise SemanticError(f"Unknown node '{stmt.name}' in node call")
 
     elif isinstance(stmt, Parallel):
-        _check_parallel(stmt, defined, node_names, return_type_names,
-                         workflow_names)
+        _check_parallel(stmt, defined, node_names, return_type_names, workflow_names)
 
     elif isinstance(stmt, Unreachable):
         pass
@@ -144,16 +175,22 @@ def _check_statement(stmt, defined: set, node_names: set,
         _check_expression_refs(stmt, defined, workflow_names)
 
 
-def _check_parallel(parallel: Parallel, defined: set, node_names: set,
-                    return_type_names: set, workflow_names: set):
+def _check_parallel(
+    parallel: Parallel,
+    defined: set,
+    node_names: set,
+    return_type_names: set,
+    workflow_names: set,
+):
     # Variables defined in parallel branches all merge into the outer scope.
     # But within the parallel block, SSA still applies — no two branches
     # can define the same variable.
     parallel_defined = set()
     for branch in parallel.branches:
         branch_defined = set(defined)
-        _check_statement(branch, branch_defined, node_names,
-                         return_type_names, workflow_names)
+        _check_statement(
+            branch, branch_defined, node_names, return_type_names, workflow_names
+        )
         # Collect newly defined variables
         new_vars = branch_defined - defined
         for var in new_vars:
@@ -185,14 +222,10 @@ def _check_route(route: Route, defined: set, node_names: set):
         target = case.target
         if isinstance(target, str):
             if target not in node_names:
-                raise SemanticError(
-                    f"Unknown node '{target}' in route target"
-                )
+                raise SemanticError(f"Unknown node '{target}' in route target")
         elif isinstance(target, NodeCall):
             if target.name not in node_names:
-                raise SemanticError(
-                    f"Unknown node '{target.name}' in route target"
-                )
+                raise SemanticError(f"Unknown node '{target.name}' in route target")
             _check_args_refs(target.args, defined)
         elif isinstance(target, Return):
             _check_expression_refs(target.value, defined)
@@ -202,9 +235,7 @@ def _check_route(route: Route, defined: set, node_names: set):
         if not has_else:
             missing = OUTCOME_VALUES - patterns
             if missing:
-                raise SemanticError(
-                    f"Incomplete outcome route: missing {missing}"
-                )
+                raise SemanticError(f"Incomplete outcome route: missing {missing}")
 
 
 def _check_expression_refs(expr, defined: set, workflow_names: set = None):
@@ -248,9 +279,7 @@ def _check_expression_refs(expr, defined: set, workflow_names: set = None):
         _check_arg_ref(expr.collection, defined)
         # Validate workflow reference against same-file workflows
         if workflow_names is not None and expr.workflow not in workflow_names:
-            raise SemanticError(
-                f"Unknown workflow '{expr.workflow}' in map"
-            )
+            raise SemanticError(f"Unknown workflow '{expr.workflow}' in map")
         # Validate on_error value
         if expr.on_error is not None and expr.on_error not in VALID_ON_ERROR:
             raise SemanticError(

@@ -27,6 +27,7 @@ def build_and_serialize(parser, fixture_name: str) -> dict:
 # Basic structure
 # ---------------------------------------------------------------------------
 
+
 class TestBasicStructure:
 
     def test_workflow_name_and_entry(self, parser):
@@ -49,6 +50,7 @@ class TestBasicStructure:
 # ---------------------------------------------------------------------------
 # Operations
 # ---------------------------------------------------------------------------
+
 
 class TestOperations:
 
@@ -170,6 +172,7 @@ class TestOperations:
 # Edges and routing
 # ---------------------------------------------------------------------------
 
+
 class TestEdges:
 
     def test_unconditional_edge(self, parser):
@@ -200,13 +203,17 @@ class TestEdges:
     def test_else_condition(self, parser):
         graph = build_graph(parser, "route")
         node = next(n for n in graph.nodes if n.name == "else_route")
-        else_edges = [e for e in node.edges if e.condition and e.condition.kind == "else"]
+        else_edges = [
+            e for e in node.edges if e.condition and e.condition.kind == "else"
+        ]
         assert len(else_edges) == 1
 
     def test_bool_condition(self, parser):
         graph = build_graph(parser, "route")
         node = next(n for n in graph.nodes if n.name == "bool_route")
-        bool_edges = [e for e in node.edges if e.condition and e.condition.kind == "bool"]
+        bool_edges = [
+            e for e in node.edges if e.condition and e.condition.kind == "bool"
+        ]
         assert len(bool_edges) == 2
 
     def test_inline_return_mixed_terminal(self, parser):
@@ -220,6 +227,7 @@ class TestEdges:
 # ---------------------------------------------------------------------------
 # Serialization
 # ---------------------------------------------------------------------------
+
 
 class TestSerialization:
 
@@ -255,22 +263,26 @@ class TestSerialization:
 # Schema validation
 # ---------------------------------------------------------------------------
 
+
 class TestSchemaValidation:
 
-    @pytest.mark.parametrize("fixture", [
-        "basic",
-        "transition",
-        "llm",
-        "tool",
-        "transform",
-        "governance",
-        "decide_session",
-        "route",
-        "parallel",
-        "return_fields",
-        "list_assignment",
-        "map",
-    ])
+    @pytest.mark.parametrize(
+        "fixture",
+        [
+            "basic",
+            "transition",
+            "llm",
+            "tool",
+            "transform",
+            "governance",
+            "decide_session",
+            "route",
+            "parallel",
+            "return_fields",
+            "list_assignment",
+            "map",
+        ],
+    )
     def test_fixture_validates(self, parser, fixture):
         data = build_and_serialize(parser, fixture)
         validate_air_graph(data)  # should not raise

@@ -4,10 +4,29 @@ Converts a CFG (with v0.2 AST instructions) into an AIR Graph.
 """
 
 from air_ast import (
-    Assign, Constructor, Decide, DottedName, FuncCall, Gate,
-    Identifier, LLMCall, ListLiteral, MapCall, NodeCall, Parallel,
-    Return, Route, Session, ToolCall, Transform, Verify, Aggregate,
-    EnumPattern, TypePattern, ElsePattern, BoolPattern,
+    Assign,
+    Constructor,
+    Decide,
+    DottedName,
+    FuncCall,
+    Gate,
+    Identifier,
+    LLMCall,
+    ListLiteral,
+    MapCall,
+    NodeCall,
+    Parallel,
+    Return,
+    Route,
+    Session,
+    ToolCall,
+    Transform,
+    Verify,
+    Aggregate,
+    EnumPattern,
+    TypePattern,
+    ElsePattern,
+    BoolPattern,
 )
 from cfg import CFG
 from air_graph.schema import (
@@ -37,6 +56,7 @@ def build_air_graph(cfg: CFG, workflow_name: str) -> AirGraphWorkflow:
 # ---------------------------------------------------------------------------
 # Edges
 # ---------------------------------------------------------------------------
+
 
 def _build_edges(instructions: list) -> list[AirGraphEdge]:
     edges = []
@@ -69,7 +89,9 @@ def _pattern_to_condition(pattern) -> AirGraphCondition:
     if isinstance(pattern, ElsePattern):
         return AirGraphCondition(kind="else")
     if isinstance(pattern, BoolPattern):
-        return AirGraphCondition(kind="bool", value="true" if pattern.value else "false")
+        return AirGraphCondition(
+            kind="bool", value="true" if pattern.value else "false"
+        )
     return AirGraphCondition(kind="enum", value=str(pattern))
 
 
@@ -83,6 +105,7 @@ def _find_route_variable(instructions: list) -> str | None:
 # ---------------------------------------------------------------------------
 # Operations
 # ---------------------------------------------------------------------------
+
 
 def _convert_instructions(instructions: list, ops: list):
     for inst in instructions:
@@ -154,9 +177,9 @@ def _convert_assign(inst: Assign) -> AirGraphOperation | None:
     if isinstance(expr, Verify):
         outputs = []
         for i, name in enumerate(raw):
-            outputs.append(AirGraphOutput(
-                name=name, type="Verdict" if i == 0 else "Evidence"
-            ))
+            outputs.append(
+                AirGraphOutput(name=name, type="Verdict" if i == 0 else "Evidence")
+            )
         return AirGraphOperation(
             type="verify",
             inputs=[_arg_to_str(expr.input)],
@@ -195,9 +218,9 @@ def _convert_assign(inst: Assign) -> AirGraphOperation | None:
         inputs = [_arg_to_str(a) for a in expr.args]
         outputs = []
         for i, name in enumerate(raw):
-            outputs.append(AirGraphOutput(
-                name=name, type="Message" if i == 0 else "Outcome"
-            ))
+            outputs.append(
+                AirGraphOutput(name=name, type="Message" if i == 0 else "Outcome")
+            )
         return AirGraphOperation(
             type="decide",
             inputs=inputs,
@@ -258,8 +281,10 @@ def _convert_return(inst: Return) -> AirGraphOperation:
             type="return",
             inputs=[],
             outputs=[],
-            params={"type": inst.value.type_name,
-                    "fields": _serialize_fields(inst.value.fields)},
+            params={
+                "type": inst.value.type_name,
+                "fields": _serialize_fields(inst.value.fields),
+            },
         )
     if isinstance(inst.value, Identifier):
         return AirGraphOperation(
@@ -273,6 +298,7 @@ def _convert_return(inst: Return) -> AirGraphOperation:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _arg_to_str(arg) -> str:
     """Convert an AST arg/expression to a string for serialization."""

@@ -9,10 +9,10 @@ from lark import Lark, Tree, UnexpectedInput
 
 from helpers import load_fixture, EXAMPLES_DIR
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def parse(parser: Lark, src: str) -> Tree:
     return parser.parse(src)
@@ -34,14 +34,18 @@ def find_all_rules(tree: Tree, rule: str) -> list[Tree]:
 # Example files
 # ---------------------------------------------------------------------------
 
+
 class TestExampleFiles:
     """All v0.2 example .air files parse without error."""
 
-    @pytest.mark.parametrize("filename", [
-        "FactCheckedPublish.air",
-        "MultiModelChat.air",
-        "KitchenSink.air",
-    ])
+    @pytest.mark.parametrize(
+        "filename",
+        [
+            "FactCheckedPublish.air",
+            "MultiModelChat.air",
+            "KitchenSink.air",
+        ],
+    )
     def test_example_parses(self, parser, filename):
         src = (EXAMPLES_DIR / filename).read_text()
         tree = parse(parser, src)
@@ -51,6 +55,7 @@ class TestExampleFiles:
 # ---------------------------------------------------------------------------
 # Version declaration
 # ---------------------------------------------------------------------------
+
 
 class TestVersionDecl:
 
@@ -81,6 +86,7 @@ workflow W -> Artifact:
 # Workflow declaration
 # ---------------------------------------------------------------------------
 
+
 class TestWorkflowDecl:
 
     def test_with_params(self, parser):
@@ -104,6 +110,7 @@ class TestWorkflowDecl:
 # ---------------------------------------------------------------------------
 # Nodes
 # ---------------------------------------------------------------------------
+
 
 class TestNodes:
 
@@ -133,6 +140,7 @@ class TestNodes:
 # ---------------------------------------------------------------------------
 # Instructions
 # ---------------------------------------------------------------------------
+
 
 class TestLlmCall:
 
@@ -259,6 +267,7 @@ class TestSession:
 # Route
 # ---------------------------------------------------------------------------
 
+
 class TestRoute:
 
     def test_outcome_route(self, parser):
@@ -297,6 +306,7 @@ class TestRoute:
 # Unconditional transition (node call as statement)
 # ---------------------------------------------------------------------------
 
+
 class TestNodeCallStatement:
 
     def test_unconditional_transition(self, parser):
@@ -307,6 +317,7 @@ class TestNodeCallStatement:
 # ---------------------------------------------------------------------------
 # Parallel
 # ---------------------------------------------------------------------------
+
 
 class TestParallel:
 
@@ -324,6 +335,7 @@ class TestParallel:
 # Return & constructors
 # ---------------------------------------------------------------------------
 
+
 class TestReturn:
 
     def test_return_with_fields(self, parser):
@@ -337,6 +349,7 @@ class TestReturn:
 # List literals & assignment
 # ---------------------------------------------------------------------------
 
+
 class TestListLiteral:
 
     def test_list_assignment(self, parser):
@@ -347,6 +360,7 @@ class TestListLiteral:
 # ---------------------------------------------------------------------------
 # Dotted names
 # ---------------------------------------------------------------------------
+
 
 class TestDottedName:
 
@@ -360,6 +374,7 @@ class TestDottedName:
 # ---------------------------------------------------------------------------
 # Multiple workflows
 # ---------------------------------------------------------------------------
+
 
 class TestMultipleWorkflows:
 
@@ -383,6 +398,7 @@ workflow B -> Artifact:
 # ---------------------------------------------------------------------------
 # Negative tests — things that should NOT parse
 # ---------------------------------------------------------------------------
+
 
 class TestRejectInvalid:
 

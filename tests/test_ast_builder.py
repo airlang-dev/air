@@ -3,11 +3,35 @@
 import pytest
 
 from air_ast import (
-    Aggregate, Assign, BoolPattern, Constructor, Decide, DottedName,
-    ElsePattern, EnumPattern, FuncCall, Gate, Identifier, LLMCall,
-    ListLiteral, MapCall, Node, NodeCall, Parallel, Param, Program,
-    Return, Route, RouteCase, Session, ToolCall, Transform, Type,
-    TypePattern, Unreachable, Verify,
+    Aggregate,
+    Assign,
+    BoolPattern,
+    Constructor,
+    Decide,
+    DottedName,
+    ElsePattern,
+    EnumPattern,
+    FuncCall,
+    Gate,
+    Identifier,
+    LLMCall,
+    ListLiteral,
+    MapCall,
+    Node,
+    NodeCall,
+    Parallel,
+    Param,
+    Program,
+    Return,
+    Route,
+    RouteCase,
+    Session,
+    ToolCall,
+    Transform,
+    Type,
+    TypePattern,
+    Unreachable,
+    Verify,
 )
 from ast_builder import ASTBuilder
 from helpers import load_fixture, build_fixture, find_node, EXAMPLES_DIR
@@ -22,13 +46,17 @@ def build(parser, src: str) -> Program:
 # Example files — smoke test
 # ---------------------------------------------------------------------------
 
+
 class TestExampleFiles:
 
-    @pytest.mark.parametrize("filename", [
-        "FactCheckedPublish.air",
-        "MultiModelChat.air",
-        "KitchenSink.air",
-    ])
+    @pytest.mark.parametrize(
+        "filename",
+        [
+            "FactCheckedPublish.air",
+            "MultiModelChat.air",
+            "KitchenSink.air",
+        ],
+    )
     def test_example_builds(self, parser, filename):
         src = (EXAMPLES_DIR / filename).read_text()
         program = build(parser, src)
@@ -38,6 +66,7 @@ class TestExampleFiles:
 # ---------------------------------------------------------------------------
 # Program-level
 # ---------------------------------------------------------------------------
+
 
 class TestProgram:
 
@@ -55,6 +84,7 @@ class TestProgram:
 # ---------------------------------------------------------------------------
 # Workflow
 # ---------------------------------------------------------------------------
+
 
 class TestWorkflow:
 
@@ -78,6 +108,7 @@ class TestWorkflow:
 # ---------------------------------------------------------------------------
 # Nodes
 # ---------------------------------------------------------------------------
+
 
 class TestNodes:
 
@@ -110,6 +141,7 @@ class TestNodes:
 # LLM
 # ---------------------------------------------------------------------------
 
+
 class TestLLM:
 
     def test_llm_two_args(self, parser):
@@ -132,6 +164,7 @@ class TestLLM:
 # Tool
 # ---------------------------------------------------------------------------
 
+
 class TestTool:
 
     def test_tool_call(self, parser):
@@ -145,6 +178,7 @@ class TestTool:
 # ---------------------------------------------------------------------------
 # Transform
 # ---------------------------------------------------------------------------
+
 
 class TestTransform:
 
@@ -175,6 +209,7 @@ class TestTransform:
 # ---------------------------------------------------------------------------
 # Map
 # ---------------------------------------------------------------------------
+
 
 class TestMap:
 
@@ -209,6 +244,7 @@ class TestMap:
 # Verify, Aggregate, Gate
 # ---------------------------------------------------------------------------
 
+
 class TestGovernance:
 
     def test_verify(self, parser):
@@ -242,6 +278,7 @@ class TestGovernance:
 # Decide, Session
 # ---------------------------------------------------------------------------
 
+
 class TestDecideSession:
 
     def test_decide(self, parser):
@@ -272,6 +309,7 @@ class TestDecideSession:
 # ---------------------------------------------------------------------------
 # Route
 # ---------------------------------------------------------------------------
+
 
 class TestRoute:
 
@@ -323,6 +361,7 @@ class TestRoute:
 # Node call (unconditional transition)
 # ---------------------------------------------------------------------------
 
+
 class TestNodeCall:
 
     def test_unconditional_transition(self, parser):
@@ -336,6 +375,7 @@ class TestNodeCall:
 # ---------------------------------------------------------------------------
 # Parallel
 # ---------------------------------------------------------------------------
+
 
 class TestParallel:
 
@@ -357,6 +397,7 @@ class TestParallel:
 # Return & Constructor
 # ---------------------------------------------------------------------------
 
+
 class TestReturn:
 
     def test_return_with_fields(self, parser):
@@ -373,6 +414,7 @@ class TestReturn:
 # List literal as expression
 # ---------------------------------------------------------------------------
 
+
 class TestListExpression:
 
     def test_list_assignment(self, parser):
@@ -385,6 +427,7 @@ class TestListExpression:
 # ---------------------------------------------------------------------------
 # Bare tool/llm call
 # ---------------------------------------------------------------------------
+
 
 class TestBareInstructionCalls:
 
