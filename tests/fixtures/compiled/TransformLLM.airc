@@ -1,0 +1,27 @@
+{
+  "air_graph_version": "0.2",
+  "workflow": "TransformLLM",
+  "entry": "start",
+  "params": [
+    {"name": "article", "type": "Message"}
+  ],
+  "nodes": {
+    "start": {
+      "operations": [
+        {
+          "type": "transform",
+          "inputs": ["article"],
+          "outputs": [{"name": "claims", "type": "Claim[]"}],
+          "params": {"target_type": "Claim[]", "via": "extract_claims"}
+        },
+        {
+          "type": "return",
+          "inputs": ["claims"],
+          "outputs": [],
+          "params": {}
+        }
+      ],
+      "terminal": true
+    }
+  }
+}

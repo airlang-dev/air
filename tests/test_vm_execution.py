@@ -73,3 +73,45 @@ class TestLLMExecution:
         result = vm.run(inputs={"content": "Some article text"})
 
         assert result == "[LLM:summarize]"
+
+
+class TestTransformExecution:
+
+    def test_llm_transform_end_to_end(self):
+        """LLM transform calls litellm through the VM."""
+        vm = AgentVM.load(COMPILED_DIR / "TransformLLM.airc")
+        vm.asset_resolver = AssetResolver(ASSETS_DIR)
+
+        with patch("runtime.transform_executor.litellm.completion") as mock:
+            mock.return_value = _mock_litellm_response('["claim1", "claim2"]')
+            result = vm.run(inputs={"article": "Some article text"})
+
+        assert result == '["claim1", "claim2"]'
+        mock.assert_called_once()
+
+    def test_func_transform_end_to_end(self):
+        """Function transform resolves and executes through the VM."""
+        vm = AgentVM.load(COMPILED_DIR / "TransformFunc.airc")
+        vm.asset_resolver = AssetResolver(ASSETS_DIR)
+
+        result = vm.run(inputs={"text": "hello world"})
+
+        assert result["type"] == "Features"
+        assert result["word_count"] == 2
+
+    def test_schema_coercion_end_to_end(self):
+        """Schema coercion parses JSON through the VM."""
+        vm = AgentVM.load(COMPILED_DIR / "TransformCoerce.airc")
+
+        result = vm.run(inputs={"data": "[1, 2, 3]"})
+
+        assert result == [1, 2, 3]
+
+    def test_transform_falls_back_without_resolver(self):
+        """Without an asset resolver, transform falls back to stub."""
+        vm = AgentVM.load(COMPILED_DIR / "TransformLLM.airc")
+        # No asset_resolver set
+
+        result = vm.run(inputs={"article": "Some text"})
+
+        assert result == ["claim"]

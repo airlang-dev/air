@@ -4,6 +4,7 @@ Resolves asset names (prompts, rules, schemas) to their content
 from a project's assets directory.
 """
 
+import importlib.util
 import os
 from dataclasses import dataclass
 
@@ -40,6 +41,22 @@ class AssetResolver:
             return self._load_plain_prompt(md_path)
 
         return None
+
+    def resolve_func(self, name):
+        """Resolve a function name to a callable.
+
+        Looks for functions/{name}.py and returns the callable named {name},
+        or None if not found.
+        """
+        func_path = os.path.join(self._base_dir, "functions", f"{name}.py")
+        if not os.path.exists(func_path):
+            return None
+
+        spec = importlib.util.spec_from_file_location(name, func_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        return getattr(module, name, None)
 
     def resolve_rule(self, name):
         """Resolve a rule name to content. Not implemented in Phase 1."""

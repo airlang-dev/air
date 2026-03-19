@@ -1,0 +1,27 @@
+{
+  "air_graph_version": "0.2",
+  "workflow": "TransformFunc",
+  "entry": "start",
+  "params": [
+    {"name": "text", "type": "Message"}
+  ],
+  "nodes": {
+    "start": {
+      "operations": [
+        {
+          "type": "transform",
+          "inputs": ["text"],
+          "outputs": [{"name": "features", "type": "Features"}],
+          "params": {"target_type": "Features", "via_func": "extract_features"}
+        },
+        {
+          "type": "return",
+          "inputs": ["features"],
+          "outputs": [],
+          "params": {}
+        }
+      ],
+      "terminal": true
+    }
+  }
+}

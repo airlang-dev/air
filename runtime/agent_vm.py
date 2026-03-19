@@ -17,6 +17,7 @@ from runtime.adapters import (
 from runtime.config import RuntimeConfig
 from runtime.edge_resolver import EdgeResolver
 from runtime.tracer import Tracer
+from runtime.transform_executor import TransformExecutor
 from runtime.variable_scope import VariableScope
 
 
@@ -123,8 +124,8 @@ class AgentVM:
 
     def _execute_transform(self, params, inputs, out_names):
         input_val = self._vars.resolve(inputs[0])
-        via = params.get("via", "transform")
-        return transform_adapter(input_val, via)
+        executor = TransformExecutor(self.asset_resolver, self.config)
+        return executor.execute(input_val, params)
 
     def _execute_verify(self, params, inputs, out_names):
         input_val = self._vars.resolve(inputs[0])

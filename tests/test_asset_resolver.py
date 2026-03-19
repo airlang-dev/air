@@ -35,3 +35,18 @@ class TestResolvePrompt:
     def test_resolve_rule_not_implemented(self, resolver):
         with pytest.raises(NotImplementedError):
             resolver.resolve_rule("some_rule")
+
+
+class TestResolveFunc:
+
+    def test_resolves_function_from_file(self, resolver):
+        """Resolves functions/{name}.py and returns the callable."""
+        func = resolver.resolve_func("extract_features")
+        assert callable(func)
+        result = func("hello world")
+        assert result["word_count"] == 2
+
+    def test_unknown_function_returns_none(self, resolver):
+        """Returns None for a function that doesn't exist."""
+        func = resolver.resolve_func("nonexistent_func")
+        assert func is None

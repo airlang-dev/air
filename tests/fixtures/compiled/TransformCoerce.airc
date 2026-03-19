@@ -1,0 +1,27 @@
+{
+  "air_graph_version": "0.2",
+  "workflow": "TransformCoerce",
+  "entry": "start",
+  "params": [
+    {"name": "data", "type": "Message"}
+  ],
+  "nodes": {
+    "start": {
+      "operations": [
+        {
+          "type": "transform",
+          "inputs": ["data"],
+          "outputs": [{"name": "numbers", "type": "Number[]"}],
+          "params": {"target_type": "Number[]"}
+        },
+        {
+          "type": "return",
+          "inputs": ["numbers"],
+          "outputs": [],
+          "params": {}
+        }
+      ],
+      "terminal": true
+    }
+  }
+}
