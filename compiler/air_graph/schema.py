@@ -42,9 +42,16 @@ class AirGraphNode:
 
 
 @dataclass
+class AirGraphParam:
+    name: str
+    type: str
+
+
+@dataclass
 class AirGraphWorkflow:
     name: str
     entry: str
+    params: list[AirGraphParam] = field(default_factory=list)
     nodes: list[AirGraphNode] = field(default_factory=list)
 
     def __repr__(self):

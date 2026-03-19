@@ -36,11 +36,17 @@ from air_graph.schema import (
     AirGraphOperation,
     AirGraphCondition,
     AirGraphOutput,
+    AirGraphParam,
 )
 
 
-def build_air_graph(cfg: CFG, workflow_name: str) -> AirGraphWorkflow:
-    graph = AirGraphWorkflow(name=workflow_name, entry=cfg.entry)
+def build_air_graph(cfg: CFG, workflow_name: str, params=None) -> AirGraphWorkflow:
+    graph_params = []
+    if params:
+        for p in params:
+            type_str = p.type.name + ("[]" if p.type.is_list else "")
+            graph_params.append(AirGraphParam(name=p.name, type=type_str))
+    graph = AirGraphWorkflow(name=workflow_name, entry=cfg.entry, params=graph_params)
     for label, cfg_node in cfg.nodes.items():
         node = AirGraphNode(
             name=label,

@@ -15,7 +15,7 @@ def build_graph(parser, fixture_name: str) -> AirGraphWorkflow:
     program = build_fixture(parser, fixture_name)
     w = program.workflows[0]
     cfg = build_cfg(w)
-    return build_air_graph(cfg, w.name)
+    return build_air_graph(cfg, w.name, params=w.params)
 
 
 def build_and_serialize(parser, fixture_name: str) -> dict:
@@ -45,6 +45,18 @@ class TestBasicStructure:
         start = next(n for n in graph.nodes if n.name == "start")
         assert start.terminal is True
         assert start.edges == []
+
+    def test_workflow_params(self, parser):
+        graph = build_graph(parser, "workflow_params")
+        assert len(graph.params) == 2
+        assert graph.params[0].name == "content"
+        assert graph.params[0].type == "Message"
+        assert graph.params[1].name == "tags"
+        assert graph.params[1].type == "Claim[]"
+
+    def test_workflow_no_params(self, parser):
+        graph = build_graph(parser, "workflow_no_params")
+        assert graph.params == []
 
 
 # ---------------------------------------------------------------------------
@@ -237,6 +249,17 @@ class TestSerialization:
         assert data["workflow"] == "W"
         assert data["entry"] == "start"
         assert "start" in data["nodes"]
+
+    def test_serialized_params(self, parser):
+        data = build_and_serialize(parser, "workflow_params")
+        assert "params" in data
+        assert len(data["params"]) == 2
+        assert data["params"][0] == {"name": "content", "type": "Message"}
+        assert data["params"][1] == {"name": "tags", "type": "Claim[]"}
+
+    def test_serialized_no_params_omitted(self, parser):
+        data = build_and_serialize(parser, "workflow_no_params")
+        assert "params" not in data
 
     def test_serialized_node_has_operations(self, parser):
         data = build_and_serialize(parser, "basic")

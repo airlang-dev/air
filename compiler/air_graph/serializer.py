@@ -66,13 +66,20 @@ def serialize_node(node):
     return result
 
 
+def serialize_param(param):
+    return {"name": param.name, "type": param.type}
+
+
 def serialize_air_graph(workflow) -> dict:
-    return {
+    result = {
         "air_graph_version": AIR_GRAPH_VERSION,
         "workflow": workflow.name,
         "entry": workflow.entry,
         "nodes": {n.name: serialize_node(n) for n in workflow.nodes},
     }
+    if workflow.params:
+        result["params"] = [serialize_param(p) for p in workflow.params]
+    return result
 
 
 def validate_air_graph(data):

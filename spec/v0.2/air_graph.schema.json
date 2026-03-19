@@ -18,6 +18,11 @@
       "type": "string",
       "description": "Entry node name"
     },
+    "params": {
+      "type": "array",
+      "description": "Workflow input parameters",
+      "items": { "$ref": "#/$defs/Param" }
+    },
     "nodes": {
       "type": "object",
       "description": "Execution nodes keyed by name",
@@ -27,6 +32,19 @@
     }
   },
   "$defs": {
+    "Param": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      }
+    },
     "ExecNode": {
       "type": "object",
       "required": ["operations", "terminal"],
