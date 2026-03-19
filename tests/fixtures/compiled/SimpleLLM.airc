@@ -1,0 +1,27 @@
+{
+  "air_graph_version": "0.2",
+  "workflow": "SimpleLLM",
+  "entry": "start",
+  "params": [
+    {"name": "content", "type": "Message"}
+  ],
+  "nodes": {
+    "start": {
+      "operations": [
+        {
+          "type": "llm",
+          "inputs": ["content"],
+          "outputs": [{"name": "summary", "type": "Message"}],
+          "params": {"prompt": "summarize"}
+        },
+        {
+          "type": "return",
+          "inputs": ["summary"],
+          "outputs": [],
+          "params": {}
+        }
+      ],
+      "terminal": true
+    }
+  }
+}

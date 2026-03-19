@@ -6,6 +6,8 @@ requires-python = ">=3.12"
 dependencies = [
     "lark",
     "jsonschema",
+    "litellm",
+    "pyyaml",
 ]
 
 [project.scripts]

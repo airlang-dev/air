@@ -1,0 +1,259 @@
+{
+  "air_graph_version": "0.2",
+  "workflow": "FactCheckedPublish",
+  "entry": "analyze",
+  "nodes": {
+    "analyze": {
+      "operations": [
+        {
+          "type": "llm",
+          "inputs": [
+            "content"
+          ],
+          "outputs": [
+            {
+              "name": "summary",
+              "type": "Message"
+            }
+          ],
+          "params": {
+            "prompt": "summarize"
+          }
+        },
+        {
+          "type": "transform",
+          "inputs": [
+            "summary"
+          ],
+          "outputs": [
+            {
+              "name": "claims",
+              "type": "Claim[]"
+            }
+          ],
+          "params": {
+            "target_type": "Claim[]",
+            "via": "extract_claims"
+          }
+        }
+      ],
+      "terminal": false,
+      "route_variable": "claims",
+      "edges": [
+        {
+          "target": "analyze",
+          "condition": {
+            "kind": "type",
+            "name": "Fault"
+          }
+        },
+        {
+          "target": "validate",
+          "condition": {
+            "kind": "else"
+          }
+        }
+      ]
+    },
+    "validate": {
+      "operations": [
+        {
+          "type": "verify",
+          "inputs": [
+            "claims"
+          ],
+          "outputs": [
+            {
+              "name": "v1",
+              "type": "Verdict"
+            }
+          ],
+          "params": {
+            "rule": "product_existence"
+          }
+        },
+        {
+          "type": "verify",
+          "inputs": [
+            "claims"
+          ],
+          "outputs": [
+            {
+              "name": "v2",
+              "type": "Verdict"
+            }
+          ],
+          "params": {
+            "rule": "link_validation"
+          }
+        },
+        {
+          "type": "verify",
+          "inputs": [
+            "claims"
+          ],
+          "outputs": [
+            {
+              "name": "v3",
+              "type": "Verdict"
+            }
+          ],
+          "params": {
+            "rule": "compute_claim"
+          }
+        },
+        {
+          "type": "aggregate",
+          "inputs": [
+            "v1",
+            "v2",
+            "v3"
+          ],
+          "outputs": [
+            {
+              "name": "__agg__",
+              "type": "Consensus"
+            }
+          ],
+          "params": {
+            "strategy": "majority"
+          }
+        },
+        {
+          "type": "gate",
+          "inputs": [
+            "__agg__"
+          ],
+          "outputs": [
+            {
+              "name": "outcome",
+              "type": "Outcome"
+            }
+          ],
+          "params": {}
+        }
+      ],
+      "terminal": false,
+      "route_variable": "outcome",
+      "edges": [
+        {
+          "target": "publish",
+          "condition": {
+            "kind": "enum",
+            "value": "PROCEED"
+          }
+        },
+        {
+          "target": "review",
+          "condition": {
+            "kind": "enum",
+            "value": "ESCALATE"
+          }
+        },
+        {
+          "target": "analyze",
+          "condition": {
+            "kind": "enum",
+            "value": "RETRY"
+          }
+        },
+        {
+          "target": "abort",
+          "condition": {
+            "kind": "enum",
+            "value": "HALT"
+          }
+        }
+      ]
+    },
+    "review": {
+      "operations": [
+        {
+          "type": "decide",
+          "inputs": [
+            "summary"
+          ],
+          "outputs": [
+            {
+              "name": "msg",
+              "type": "Message"
+            },
+            {
+              "name": "outcome",
+              "type": "Outcome"
+            }
+          ],
+          "params": {
+            "provider": "human_reviewer"
+          }
+        }
+      ],
+      "terminal": false,
+      "route_variable": "outcome",
+      "edges": [
+        {
+          "target": "publish",
+          "condition": {
+            "kind": "enum",
+            "value": "PROCEED"
+          }
+        },
+        {
+          "target": "abort",
+          "condition": {
+            "kind": "enum",
+            "value": "ESCALATE"
+          }
+        },
+        {
+          "target": "analyze",
+          "condition": {
+            "kind": "enum",
+            "value": "RETRY"
+          }
+        },
+        {
+          "target": "abort",
+          "condition": {
+            "kind": "enum",
+            "value": "HALT"
+          }
+        }
+      ]
+    },
+    "publish": {
+      "operations": [
+        {
+          "type": "return",
+          "inputs": [],
+          "outputs": [],
+          "params": {
+            "type": "Artifact",
+            "fields": {
+              "status": "verified",
+              "summary": "summary",
+              "verification": "outcome"
+            }
+          }
+        }
+      ],
+      "terminal": true
+    },
+    "abort": {
+      "operations": [
+        {
+          "type": "return",
+          "inputs": [],
+          "outputs": [],
+          "params": {
+            "type": "Fault",
+            "fields": {
+              "reason": "Verification failed"
+            }
+          }
+        }
+      ],
+      "terminal": true
+    }
+  }
+}

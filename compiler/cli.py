@@ -24,12 +24,26 @@ def main():
     backend_p.add_argument("air_graph_file", help="Path to AIR Graph (.airc) file")
     backend_p.add_argument("--output", "-o", help="Output path")
 
+    run_p = sub.add_parser("run", help="Execute a compiled AIR Graph (.airc)")
+    run_p.add_argument("airc_file", help="Path to compiled .airc file")
+    run_p.add_argument(
+        "--input",
+        action="append",
+        default=[],
+        help="Workflow input as key=value (repeatable)",
+    )
+    run_p.add_argument("--input-file", help="JSON file with workflow inputs")
+    run_p.add_argument("--config", help="Path to air.config.yaml")
+    run_p.add_argument("--assets", help="Path to assets directory")
+
     args = parser.parse_args()
 
     if args.command == "compile":
         compile_air(args.file, args.output)
     elif args.command == "backend":
         run_backend(args.backend_name, args.air_graph_file, args.output)
+    elif args.command == "run":
+        run_workflow(args)
     else:
         parser.print_help()
         sys.exit(1)
@@ -70,7 +84,7 @@ def compile_air(input_file, output_path):
             cfg = build_cfg(wf)
             print("[ok] CFG built")
 
-            air_graph = build_air_graph(cfg, wf.name)
+            air_graph = build_air_graph(cfg, wf.name, params=wf.params)
             print("[ok] AIR Graph built")
 
             if output_path:
@@ -115,6 +129,34 @@ def run_backend(backend_name, air_graph_file, output_path):
     code = backend.compile(air_graph, output_path)
     out = output_path or f"build/{air_graph['workflow']}_langgraph.py"
     print(f"[ok] Generated: {out}")
+
+
+def run_workflow(args):
+    import json
+
+    from runtime.agent_vm import AgentVM
+    from runtime.asset_resolver import AssetResolver
+    from runtime.config import RuntimeConfig
+
+    vm = AgentVM.load(args.airc_file)
+
+    if args.config:
+        vm.config = RuntimeConfig.from_file(args.config)
+
+    if args.assets:
+        vm.asset_resolver = AssetResolver(args.assets)
+
+    inputs = {}
+    if args.input_file:
+        with open(args.input_file) as f:
+            inputs = json.load(f)
+    for kv in args.input:
+        key, _, value = kv.partition("=")
+        inputs[key] = value
+
+    print(f"[VM] executing workflow: {vm._graph['workflow']}")
+    result = vm.run(inputs=inputs if inputs else None)
+    print(f"\n[VM] result: {result}")
 
 
 if __name__ == "__main__":

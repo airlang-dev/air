@@ -1,0 +1,6 @@
+model: claude-sonnet-4-20250514
+template: |
+  Extract all factual claims from the following text.
+  Return them as a structured list.
+
+  {{input}}

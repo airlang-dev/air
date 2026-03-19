@@ -1,3 +1,9 @@
+"""AIR Agent VM — loads and executes AIR Graph (.airc) workflows."""
+
+import json
+
+import litellm
+
 from runtime.adapters import (
     llm_adapter,
     transform_adapter,
@@ -8,299 +14,183 @@ from runtime.adapters import (
     session_adapter,
     map_adapter,
 )
+from runtime.config import RuntimeConfig
+from runtime.edge_resolver import EdgeResolver
+from runtime.tracer import Tracer
+from runtime.variable_scope import VariableScope
 
 
-def execute_workflow(data):
-    nodes = data["nodes"]
-    current = data["entry"]
-    state = {"variables": {}, "trace": []}
+class AgentVM:
+    """Loads a compiled AIR Graph and executes it as a state machine."""
 
-    print(f'[TRACE] workflow.start workflow={data["workflow"]}')
+    def __init__(self, graph):
+        self._graph = graph
+        self._nodes = graph["nodes"]
+        self.asset_resolver = None
+        self.config = RuntimeConfig()
+        self._tracer = Tracer()
 
-    while True:
-        node = nodes[current]
-        print(f"[TRACE] node.enter node={current}")
+    @classmethod
+    def load(cls, path):
+        """Load a compiled .airc file and return an AgentVM instance."""
+        with open(path) as f:
+            graph = json.load(f)
+        return cls(graph)
 
-        result = _execute_operations(node["operations"], state, current)
-        if result is not None:
-            print(f"[TRACE] workflow.end ops={len(state['trace'])}")
-            return result
+    def run(self, inputs=None):
+        """Execute the workflow with optional inputs, return the result."""
+        self._vars = VariableScope(inputs)
+        self._tracer = Tracer()
+        current = self._graph["entry"]
 
-        if node.get("terminal") and not node.get("edges"):
-            print(f"[TRACE] workflow.end ops={len(state['trace'])}")
-            return None
+        self._tracer.workflow_start(self._graph["workflow"])
 
-        edges = node.get("edges", [])
-        if not edges:
-            print(f"[TRACE] workflow.end ops={len(state['trace'])}")
-            return None
+        while True:
+            node = self._nodes[current]
+            self._tracer.node_enter(current)
 
-        route_var = node.get("route_variable")
-        if route_var:
-            value = _resolve_variable(state["variables"], route_var)
-        else:
-            value = None
+            result = self._execute_operations(node["operations"], current)
+            if result is not None:
+                self._tracer.workflow_end()
+                return result
 
-        target, matched = _resolve_edge(value, edges, current, nodes)
-        print(f"[TRACE] route variable={route_var} matched={matched} next={target}")
-        current = target
-
-
-def _resolve_variable(variables, name):
-    """Resolve a variable name, supporting dotted notation."""
-    if "." in name:
-        parts = name.split(".", 1)
-        obj = variables[parts[0]]
-        if isinstance(obj, dict):
-            return obj[parts[1]]
-        return getattr(obj, parts[1])
-    return variables[name]
-
-
-def _output_names(outputs):
-    """Extract variable names from typed output list."""
-    return [o["name"] if isinstance(o, dict) else o for o in outputs]
-
-
-def _execute_operations(operations, state, node_id):
-    variables = state["variables"]
-    for op in operations:
-        op_type = op["type"]
-        inputs = op["inputs"]
-        outputs = op["outputs"]
-        out_names = _output_names(outputs)
-        params = op.get("params", {})
-
-        _trace_op_start(op_type, params, inputs)
-
-        if op_type == "llm":
-            input_vals = [variables.get(i, i) for i in inputs]
-            value = llm_adapter(params["prompt"], *input_vals)
-            _store(variables, out_names, value)
-            _trace_op_end(out_names, value)
-
-        elif op_type == "transform":
-            input_val = variables[inputs[0]]
-            via = params.get("via", "transform")
-            value = transform_adapter(input_val, via)
-            _store(variables, out_names, value)
-            _trace_op_end(out_names, value)
-
-        elif op_type == "verify":
-            input_val = variables[inputs[0]]
-            rule = params["rule"]
-            value = verify_adapter(input_val, rule)
-            _store(variables, out_names, value)
-            _trace_op_end(out_names, value)
-
-        elif op_type == "aggregate":
-            values = [variables[i] for i in inputs]
-            strategy = params["strategy"]
-            value = aggregate_adapter(values, strategy)
-            _store(variables, out_names, value)
-            _trace_op_end(out_names, value)
-
-        elif op_type == "gate":
-            input_val = variables[inputs[0]]
-            value = gate_adapter(input_val)
-            _store(variables, out_names, value)
-            _trace_op_end(out_names, value)
-
-        elif op_type == "decide":
-            input_val = variables.get(inputs[0], inputs[0]) if inputs else None
-            provider = params["provider"]
-            msg, outcome = decision_adapter(provider, input_val)
-            if len(out_names) >= 2:
-                variables[out_names[0]] = msg
-                variables[out_names[1]] = outcome
-                _trace_op_end(out_names[:1], msg)
-                _trace_op_end(out_names[1:], outcome)
-            elif len(out_names) == 1:
-                variables[out_names[0]] = outcome
-                _trace_op_end(out_names, outcome)
-
-        elif op_type == "session":
-            input_vals = [variables.get(i, i) for i in inputs]
-            value = session_adapter(*input_vals)
-            _store(variables, out_names, value)
-            _trace_op_end(out_names, value)
-
-        elif op_type == "return":
-            fields = params.get("fields", {})
-            if fields:
-                ret_type = params.get("type", "Result")
-                resolved = {k: variables.get(v, v) for k, v in fields.items()}
-                print(f"[TRACE] return type={ret_type}")
-                state["trace"].append(
-                    {
-                        "node": node_id,
-                        "operation": op_type,
-                        "inputs": inputs,
-                        "outputs": out_names,
-                        "params": params,
-                    }
-                )
-                return {"type": ret_type, "fields": resolved}
-            elif inputs:
-                value = variables.get(inputs[0], inputs[0])
-                print(f"[TRACE] return value={value}")
-                state["trace"].append(
-                    {
-                        "node": node_id,
-                        "operation": op_type,
-                        "inputs": inputs,
-                        "outputs": out_names,
-                        "params": params,
-                    }
-                )
-                return value
-            else:
-                print("[TRACE] return")
-                state["trace"].append(
-                    {
-                        "node": node_id,
-                        "operation": op_type,
-                        "inputs": inputs,
-                        "outputs": out_names,
-                        "params": params,
-                    }
-                )
+            if node.get("terminal") and not node.get("edges"):
+                self._tracer.workflow_end()
                 return None
 
-        elif op_type == "construct":
-            con_type = params.get("type")
-            fields = params.get("fields", {})
-            if con_type and fields:
-                resolved = {k: variables.get(v, v) for k, v in fields.items()}
-                value = {"type": con_type, "fields": resolved}
-            else:
-                # List construct
-                value = [variables.get(i, i) for i in inputs]
-            _store(variables, out_names, value)
-            _trace_op_end(out_names, value)
+            edges = node.get("edges", [])
+            if not edges:
+                self._tracer.workflow_end()
+                return None
 
-        elif op_type == "tool":
-            name = params["name"]
-            value = f"[TOOL:{name}]"
-            _store(variables, out_names, value)
-            if out_names:
-                _trace_op_end(out_names, value)
+            route_var = node.get("route_variable")
+            value = self._vars.resolve(route_var) if route_var else None
 
-        elif op_type == "map":
-            workflow = params.get("workflow", "Unknown")
-            collection = variables.get(inputs[0], []) if inputs else []
-            concurrency = params.get("concurrency", 1)
-            on_error = params.get("on_error", "halt")
-            value = map_adapter(
-                collection, workflow, concurrency=concurrency, on_error=on_error
-            )
-            _store(variables, out_names, value)
-            if out_names:
-                _trace_op_end(out_names, value)
+            target, matched = EdgeResolver.resolve(value, edges)
+            if target not in self._nodes:
+                raise RuntimeError(
+                    f"VM error: invalid edge target '{target}' from node '{current}'"
+                )
+            self._tracer.route(route_var, matched, target)
+            current = target
 
-        state["trace"].append(
-            {
-                "node": node_id,
-                "operation": op_type,
-                "inputs": inputs,
-                "outputs": out_names,
-                "params": params,
-            }
+    def _execute_operations(self, operations, node_id):
+        for op in operations:
+            op_type = op["type"]
+            inputs = op["inputs"]
+            out_names = self._output_names(op["outputs"])
+            params = op.get("params", {})
+
+            self._tracer.op_start(op_type, params, inputs)
+
+            handler = getattr(self, f"_execute_{op_type}", None)
+            if handler is None:
+                raise RuntimeError(f"unknown operation type: {op_type}")
+
+            result = handler(params, inputs, out_names)
+
+            if op_type == "return":
+                self._tracer.record(node_id, op_type, inputs, out_names, params)
+                return result
+
+            self._vars.store(out_names, result)
+            self._tracer.op_end(out_names, result)
+            self._tracer.record(node_id, op_type, inputs, out_names, params)
+
+        return None
+
+    def _execute_llm(self, params, inputs, out_names):
+        prompt_name = params["prompt"]
+        input_vals = [self._vars.get(i) for i in inputs]
+
+        if self.asset_resolver is None:
+            return llm_adapter(prompt_name, *input_vals)
+
+        asset = self.asset_resolver.resolve_prompt(prompt_name)
+        if asset is None:
+            return llm_adapter(prompt_name, *input_vals)
+
+        model = asset.model or self.config.default_model
+        user_content = asset.template
+        for val in input_vals:
+            user_content += f"\n\n{val}"
+
+        response = litellm.completion(
+            model=model,
+            messages=[{"role": "user", "content": user_content}],
+        )
+        return response.choices[0].message.content
+
+    def _execute_transform(self, params, inputs, out_names):
+        input_val = self._vars.resolve(inputs[0])
+        via = params.get("via", "transform")
+        return transform_adapter(input_val, via)
+
+    def _execute_verify(self, params, inputs, out_names):
+        input_val = self._vars.resolve(inputs[0])
+        rule = params["rule"]
+        return verify_adapter(input_val, rule)
+
+    def _execute_aggregate(self, params, inputs, out_names):
+        values = [self._vars.resolve(i) for i in inputs]
+        strategy = params["strategy"]
+        return aggregate_adapter(values, strategy)
+
+    def _execute_gate(self, params, inputs, out_names):
+        input_val = self._vars.resolve(inputs[0])
+        return gate_adapter(input_val)
+
+    def _execute_decide(self, params, inputs, out_names):
+        input_val = self._vars.get(inputs[0]) if inputs else None
+        provider = params["provider"]
+        msg, outcome = decision_adapter(provider, input_val)
+        if len(out_names) >= 2:
+            return msg, outcome
+        return outcome
+
+    def _execute_session(self, params, inputs, out_names):
+        input_vals = [self._vars.get(i) for i in inputs]
+        return session_adapter(*input_vals)
+
+    def _execute_return(self, params, inputs, out_names):
+        fields = params.get("fields", {})
+        if fields:
+            ret_type = params.get("type", "Result")
+            resolved = {k: self._vars.get(v) for k, v in fields.items()}
+            self._tracer.return_value(type_name=ret_type)
+            return {"type": ret_type, "fields": resolved}
+        elif inputs:
+            value = self._vars.get(inputs[0])
+            self._tracer.return_value(value=value)
+            return value
+        else:
+            self._tracer.return_value()
+            return None
+
+    def _execute_construct(self, params, inputs, out_names):
+        con_type = params.get("type")
+        fields = params.get("fields", {})
+        if con_type and fields:
+            resolved = {k: self._vars.get(v) for k, v in fields.items()}
+            return {"type": con_type, "fields": resolved}
+        return [self._vars.get(i) for i in inputs]
+
+    def _execute_tool(self, params, inputs, out_names):
+        name = params["name"]
+        return f"[TOOL:{name}]"
+
+    def _execute_map(self, params, inputs, out_names):
+        workflow = params.get("workflow", "Unknown")
+        collection = self._vars.get(inputs[0]) if inputs else []
+        concurrency = params.get("concurrency", 1)
+        on_error = params.get("on_error", "halt")
+        return map_adapter(
+            collection,
+            workflow,
+            concurrency=concurrency,
+            on_error=on_error,
         )
 
-    return None
-
-
-def _store(variables, out_names, value):
-    if out_names:
-        variables[out_names[0]] = value
-
-
-def _trace_op_start(op_type, params, inputs):
-    parts = [f"[TRACE] op.start type={op_type}"]
-    if op_type == "llm":
-        parts.append(f"prompt={params['prompt']}")
-    elif op_type == "transform":
-        parts.append(f"via={params.get('via', 'transform')}")
-    elif op_type == "verify":
-        parts.append(f"rule={params['rule']}")
-    elif op_type == "aggregate":
-        parts.append(f"strategy={params['strategy']}")
-    elif op_type == "gate":
-        parts.append(f"input={inputs[0]}")
-    elif op_type == "decide":
-        parts.append(f"provider={params['provider']}")
-    elif op_type == "session":
-        pass
-    elif op_type == "tool":
-        parts.append(f"name={params['name']}")
-    elif op_type == "map":
-        parts.append(f"workflow={params.get('workflow', 'Unknown')}")
-    elif op_type == "return":
-        parts.append(f"return_type={params.get('type', 'Result')}")
-    elif op_type == "construct":
-        parts.append(f"construct_type={params.get('type', 'list')}")
-    print(" ".join(parts))
-
-
-def _trace_op_end(out_names, value):
-    out = out_names[0] if out_names else ""
-    print(f'[TRACE] op.end output={out} value="{value}"')
-
-
-def _resolve_edge(value, edges, current_node, nodes):
-    target = None
-    matched = None
-
-    for edge in edges:
-        cond = edge.get("condition")
-        if cond is None:
-            target = edge["target"]
-            matched = "unconditional"
-            break
-
-        kind = cond["kind"]
-
-        if kind == "enum" and cond.get("value") == value:
-            target = edge["target"]
-            matched = cond["value"]
-            break
-
-        if kind == "bool":
-            bool_val = bool(value) if cond["value"] == "true" else not bool(value)
-            if bool_val:
-                target = edge["target"]
-                matched = cond["value"]
-                break
-
-        if kind == "type":
-            is_list = cond.get("is_list", False)
-            if is_list and isinstance(value, list):
-                target = edge["target"]
-                matched = f"{cond['name']}[]"
-                break
-            elif not is_list and not isinstance(value, list):
-                target = edge["target"]
-                matched = cond.get("name", "type")
-                break
-
-    # "else" fallback
-    if target is None:
-        for edge in edges:
-            cond = edge.get("condition")
-            if cond and cond["kind"] == "else":
-                target = edge["target"]
-                matched = "else"
-                break
-
-    if target is None:
-        raise RuntimeError(
-            f"no matching edge for value {value!r} in node '{current_node}'"
-        )
-
-    if target not in nodes:
-        raise RuntimeError(
-            f"VM error: invalid edge target '{target}' from node '{current_node}'"
-        )
-
-    return target, matched
+    def _output_names(self, outputs):
+        """Extract variable names from typed output list."""
+        return [o["name"] if isinstance(o, dict) else o for o in outputs]
