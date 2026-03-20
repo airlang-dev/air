@@ -8,6 +8,7 @@ from runtime.config import RuntimeConfig
 from runtime.verify_executor import VerifyExecutor
 
 ASSETS_DIR = Path(__file__).resolve().parent / "fixtures" / "assets"
+RESOLVER = AssetResolver(ASSETS_DIR)
 
 
 def _mock_litellm_response(content):
@@ -21,8 +22,7 @@ class TestVerifyLLM:
 
     def test_calls_litellm_with_rule_and_input(self):
         """Verify resolves rule asset and calls litellm."""
-        resolver = AssetResolver(ASSETS_DIR)
-        executor = VerifyExecutor(resolver, RuntimeConfig())
+        executor = VerifyExecutor(RESOLVER, RuntimeConfig())
 
         with patch(
             "runtime.verify_executor.litellm.completion"
@@ -40,8 +40,7 @@ class TestVerifyLLM:
 
     def test_parses_fail_verdict(self):
         """Extracts FAIL from LLM response."""
-        resolver = AssetResolver(ASSETS_DIR)
-        executor = VerifyExecutor(resolver, RuntimeConfig())
+        executor = VerifyExecutor(RESOLVER, RuntimeConfig())
 
         with patch(
             "runtime.verify_executor.litellm.completion"
@@ -55,8 +54,7 @@ class TestVerifyLLM:
 
     def test_parses_uncertain_verdict(self):
         """Extracts UNCERTAIN from LLM response."""
-        resolver = AssetResolver(ASSETS_DIR)
-        executor = VerifyExecutor(resolver, RuntimeConfig())
+        executor = VerifyExecutor(RESOLVER, RuntimeConfig())
 
         with patch(
             "runtime.verify_executor.litellm.completion"
@@ -70,8 +68,7 @@ class TestVerifyLLM:
 
     def test_parses_verdict_from_mixed_text(self):
         """Extracts verdict even when embedded in longer text."""
-        resolver = AssetResolver(ASSETS_DIR)
-        executor = VerifyExecutor(resolver, RuntimeConfig())
+        executor = VerifyExecutor(RESOLVER, RuntimeConfig())
 
         with patch(
             "runtime.verify_executor.litellm.completion"
@@ -85,8 +82,7 @@ class TestVerifyLLM:
 
     def test_defaults_to_uncertain_on_unparseable(self):
         """Returns UNCERTAIN when verdict cannot be parsed."""
-        resolver = AssetResolver(ASSETS_DIR)
-        executor = VerifyExecutor(resolver, RuntimeConfig())
+        executor = VerifyExecutor(RESOLVER, RuntimeConfig())
 
         with patch(
             "runtime.verify_executor.litellm.completion"
@@ -100,8 +96,7 @@ class TestVerifyLLM:
 
     def test_uses_model_from_rule_asset(self):
         """The model from the rule asset is passed to litellm."""
-        resolver = AssetResolver(ASSETS_DIR)
-        executor = VerifyExecutor(resolver, RuntimeConfig())
+        executor = VerifyExecutor(RESOLVER, RuntimeConfig())
 
         with patch(
             "runtime.verify_executor.litellm.completion"
@@ -111,16 +106,3 @@ class TestVerifyLLM:
 
         call_kwargs = mock_completion.call_args
         assert call_kwargs.kwargs.get("model") == "claude-sonnet-4-20250514"
-
-    def test_falls_back_to_stub_without_resolver(self):
-        """Without an asset resolver, falls back to stub."""
-        executor = VerifyExecutor(None, RuntimeConfig())
-        result = executor.execute("claims", "product_existence")
-        assert result == "PASS"
-
-    def test_falls_back_to_stub_when_rule_not_found(self):
-        """When the rule doesn't exist, falls back to stub."""
-        resolver = AssetResolver(ASSETS_DIR)
-        executor = VerifyExecutor(resolver, RuntimeConfig())
-        result = executor.execute("claims", "nonexistent_rule")
-        assert result == "PASS"

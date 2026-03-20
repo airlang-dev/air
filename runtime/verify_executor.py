@@ -8,8 +8,6 @@ import re
 
 import litellm
 
-from runtime.adapters import verify_adapter
-
 
 class VerifyExecutor:
     """Executes verify operations via LLM-based rule evaluation."""
@@ -20,13 +18,7 @@ class VerifyExecutor:
 
     def execute(self, input_val, rule_name):
         """Verify input against a rule. Returns (verdict, evidence) tuple."""
-        if self._asset_resolver is None:
-            return verify_adapter(input_val, rule_name)
-
         asset = self._asset_resolver.resolve_rule(rule_name)
-        if asset is None:
-            return verify_adapter(input_val, rule_name)
-
         model = asset.model or self._config.default_model
         user_content = (
             "Evaluate the following against this rule. "

@@ -34,7 +34,7 @@ def main():
     )
     run_p.add_argument("--input-file", help="JSON file with workflow inputs")
     run_p.add_argument("--config", help="Path to air.config.yaml")
-    run_p.add_argument("--assets", help="Path to assets directory")
+    run_p.add_argument("--assets", help="Path to assets directory (default: .airc file directory)")
 
     args = parser.parse_args()
 
@@ -138,13 +138,9 @@ def run_workflow(args):
     from runtime.asset_resolver import AssetResolver
     from runtime.config import RuntimeConfig
 
-    vm = AgentVM.load(args.airc_file)
-
-    if args.config:
-        vm.config = RuntimeConfig.from_file(args.config)
-
-    if args.assets:
-        vm.asset_resolver = AssetResolver(args.assets)
+    config = RuntimeConfig.from_file(args.config) if args.config else None
+    asset_resolver = AssetResolver(args.assets) if args.assets else None
+    vm = AgentVM.load(args.airc_file, asset_resolver, config)
 
     inputs = {}
     if args.input_file:

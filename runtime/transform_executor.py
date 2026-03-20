@@ -10,8 +10,6 @@ import json
 
 import litellm
 
-from runtime.adapters import transform_adapter
-
 
 class TransformExecutor:
     """Executes transform operations by dispatching on params."""
@@ -31,13 +29,7 @@ class TransformExecutor:
 
     def _via_llm(self, input_val, prompt_name):
         """Transform via LLM: resolve prompt, call litellm."""
-        if self._asset_resolver is None:
-            return transform_adapter(input_val, prompt_name)
-
         asset = self._asset_resolver.resolve_prompt(prompt_name)
-        if asset is None:
-            return transform_adapter(input_val, prompt_name)
-
         model = asset.model or self._config.default_model
         user_content = f"{asset.template}\n\n{input_val}"
 
@@ -49,13 +41,7 @@ class TransformExecutor:
 
     def _via_func(self, input_val, func_name):
         """Transform via function: resolve and call Python function."""
-        if self._asset_resolver is None:
-            return transform_adapter(input_val, func_name)
-
         func = self._asset_resolver.resolve_func(func_name)
-        if func is None:
-            return {"type": "Fault", "reason": f"function '{func_name}' not found"}
-
         try:
             return func(input_val)
         except Exception as e:

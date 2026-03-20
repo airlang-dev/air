@@ -1,14 +1,15 @@
 """AIR Agent VM — loads and executes AIR Graph (.airc) workflows."""
 
 import json
+import os
 
 from runtime.adapters import (
-    transform_adapter,
     decision_adapter,
     session_adapter,
     map_adapter,
 )
 from runtime.aggregate_executor import AggregateExecutor
+from runtime.asset_resolver import AssetResolver
 from runtime.config import RuntimeConfig
 from runtime.edge_resolver import EdgeResolver
 from runtime.gate_executor import GateExecutor
@@ -22,19 +23,22 @@ from runtime.verify_executor import VerifyExecutor
 class AgentVM:
     """Loads a compiled AIR Graph and executes it as a state machine."""
 
-    def __init__(self, graph):
+    def __init__(self, graph, asset_resolver=None, config=None):
         self._graph = graph
         self._nodes = graph["nodes"]
-        self.asset_resolver = None
-        self.config = RuntimeConfig()
+        self.asset_resolver = asset_resolver or AssetResolver(".")
+        self.config = config or RuntimeConfig()
         self._tracer = Tracer()
 
     @classmethod
-    def load(cls, path):
+    def load(cls, path, asset_resolver=None, config=None):
         """Load a compiled .airc file and return an AgentVM instance."""
         with open(path) as f:
             graph = json.load(f)
-        return cls(graph)
+        if asset_resolver is None:
+            airc_dir = os.path.dirname(os.path.abspath(path))
+            asset_resolver = AssetResolver(airc_dir)
+        return cls(graph, asset_resolver, config)
 
     def run(self, inputs=None):
         """Execute the workflow with optional inputs, return the result."""

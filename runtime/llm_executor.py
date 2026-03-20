@@ -15,14 +15,7 @@ class LLMExecutor:
 
     def execute(self, prompt_name, input_vals):
         """Resolve prompt and call litellm. Returns response content string."""
-        if self._asset_resolver is None:
-            raise RuntimeError("asset_resolver is required for LLM execution")
         asset = self._asset_resolver.resolve_prompt(prompt_name)
-        if asset is None:
-            raise RuntimeError(
-                f"prompt asset '{prompt_name}' not found"
-            )
-
         model = asset.model or self._config.default_model
         user_content = asset.template
         for val in input_vals:

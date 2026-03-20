@@ -3,13 +3,12 @@
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-import pytest
-
 from runtime.agent_vm import AgentVM
 from runtime.asset_resolver import AssetResolver
 
 COMPILED_DIR = Path(__file__).resolve().parent / "fixtures" / "compiled"
 ASSETS_DIR = Path(__file__).resolve().parent / "fixtures" / "assets"
+RESOLVER = AssetResolver(ASSETS_DIR)
 
 
 def _mock_litellm_response(content):
@@ -19,19 +18,11 @@ def _mock_litellm_response(content):
     return response
 
 
-def test_vm_requires_asset_resolver():
-    """The VM raises when no asset resolver is configured."""
-    vm = AgentVM.load(COMPILED_DIR / "SimpleLLM.airc")
-    with pytest.raises(RuntimeError, match="asset_resolver is required"):
-        vm.run(inputs={"content": "Some article text"})
-
-
 class TestLLMExecution:
 
     def test_llm_calls_litellm(self):
         """The VM calls litellm.completion() with resolved prompt."""
-        vm = AgentVM.load(COMPILED_DIR / "SimpleLLM.airc")
-        vm.asset_resolver = AssetResolver(ASSETS_DIR)
+        vm = AgentVM.load(COMPILED_DIR / "SimpleLLM.airc", RESOLVER)
 
         with patch("runtime.llm_executor.litellm.completion") as mock_completion:
             mock_completion.return_value = _mock_litellm_response(
@@ -47,8 +38,7 @@ class TestLLMExecution:
 
     def test_llm_uses_model_from_prompt_asset(self):
         """The model specified in a YAML prompt asset is passed to litellm."""
-        vm = AgentVM.load(COMPILED_DIR / "SimpleLLM.airc")
-        vm.asset_resolver = AssetResolver(ASSETS_DIR)
+        vm = AgentVM.load(COMPILED_DIR / "SimpleLLM.airc", RESOLVER)
 
         # Use extract_claims which has model: claude-sonnet-4-20250514
         vm._graph["nodes"]["start"]["operations"][0]["params"]["prompt"] = (
@@ -64,24 +54,12 @@ class TestLLMExecution:
         call_kwargs = mock_completion.call_args
         assert call_kwargs.kwargs.get("model") == "claude-sonnet-4-20250514"
 
-    def test_llm_raises_on_missing_prompt(self):
-        """Raises RuntimeError when prompt asset not found."""
-        vm = AgentVM.load(COMPILED_DIR / "SimpleLLM.airc")
-        vm.asset_resolver = AssetResolver(ASSETS_DIR)
-        vm._graph["nodes"]["start"]["operations"][0]["params"]["prompt"] = (
-            "nonexistent"
-        )
-
-        with pytest.raises(RuntimeError, match="prompt asset 'nonexistent' not found"):
-            vm.run(inputs={"content": "Some text"})
-
 
 class TestTransformExecution:
 
     def test_llm_transform_end_to_end(self):
         """LLM transform calls litellm through the VM."""
-        vm = AgentVM.load(COMPILED_DIR / "TransformLLM.airc")
-        vm.asset_resolver = AssetResolver(ASSETS_DIR)
+        vm = AgentVM.load(COMPILED_DIR / "TransformLLM.airc", RESOLVER)
 
         with patch("runtime.transform_executor.litellm.completion") as mock:
             mock.return_value = _mock_litellm_response('["claim1", "claim2"]')
@@ -92,8 +70,7 @@ class TestTransformExecution:
 
     def test_func_transform_end_to_end(self):
         """Function transform resolves and executes through the VM."""
-        vm = AgentVM.load(COMPILED_DIR / "TransformFunc.airc")
-        vm.asset_resolver = AssetResolver(ASSETS_DIR)
+        vm = AgentVM.load(COMPILED_DIR / "TransformFunc.airc", RESOLVER)
 
         result = vm.run(inputs={"text": "hello world"})
 
@@ -102,28 +79,18 @@ class TestTransformExecution:
 
     def test_schema_coercion_end_to_end(self):
         """Schema coercion parses JSON through the VM."""
-        vm = AgentVM.load(COMPILED_DIR / "TransformCoerce.airc")
+        vm = AgentVM.load(COMPILED_DIR / "TransformCoerce.airc", RESOLVER)
 
         result = vm.run(inputs={"data": "[1, 2, 3]"})
 
         assert result == [1, 2, 3]
-
-    def test_transform_falls_back_without_resolver(self):
-        """Without an asset resolver, transform falls back to stub."""
-        vm = AgentVM.load(COMPILED_DIR / "TransformLLM.airc")
-        # No asset_resolver set
-
-        result = vm.run(inputs={"article": "Some text"})
-
-        assert result == ["claim"]
 
 
 class TestGovernanceExecution:
 
     def test_verify_via_llm(self):
         """Verify calls litellm with resolved rule through the VM."""
-        vm = AgentVM.load(COMPILED_DIR / "SimpleVerify.airc")
-        vm.asset_resolver = AssetResolver(ASSETS_DIR)
+        vm = AgentVM.load(COMPILED_DIR / "SimpleVerify.airc", RESOLVER)
 
         with patch("runtime.verify_executor.litellm.completion") as mock:
             mock.return_value = _mock_litellm_response(
@@ -136,8 +103,7 @@ class TestGovernanceExecution:
 
     def test_verify_with_evidence(self):
         """Verify with two outputs stores both verdict and evidence."""
-        vm = AgentVM.load(COMPILED_DIR / "VerifyEvidence.airc")
-        vm.asset_resolver = AssetResolver(ASSETS_DIR)
+        vm = AgentVM.load(COMPILED_DIR / "VerifyEvidence.airc", RESOLVER)
 
         with patch("runtime.verify_executor.litellm.completion") as mock:
             mock.return_value = _mock_litellm_response(
@@ -150,8 +116,7 @@ class TestGovernanceExecution:
 
     def test_governance_chain_proceed(self):
         """Full chain: verify→aggregate→gate routes to PROCEED."""
-        vm = AgentVM.load(COMPILED_DIR / "GovernanceChain.airc")
-        vm.asset_resolver = AssetResolver(ASSETS_DIR)
+        vm = AgentVM.load(COMPILED_DIR / "GovernanceChain.airc", RESOLVER)
 
         with patch("runtime.verify_executor.litellm.completion") as mock:
             mock.return_value = _mock_litellm_response("PASS\n\nLooks good.")
@@ -161,18 +126,10 @@ class TestGovernanceExecution:
 
     def test_governance_chain_escalate(self):
         """Full chain: FAIL verdicts route to ESCALATE."""
-        vm = AgentVM.load(COMPILED_DIR / "GovernanceChain.airc")
-        vm.asset_resolver = AssetResolver(ASSETS_DIR)
+        vm = AgentVM.load(COMPILED_DIR / "GovernanceChain.airc", RESOLVER)
 
         with patch("runtime.verify_executor.litellm.completion") as mock:
             mock.return_value = _mock_litellm_response("FAIL\n\nBad claims.")
             result = vm.run(inputs={"claims": "bad claims"})
 
         assert result == "ESCALATE"
-
-    def test_verify_falls_back_without_resolver(self):
-        """Without an asset resolver, verify falls back to stub."""
-        vm = AgentVM.load(COMPILED_DIR / "SimpleVerify.airc")
-        # No asset_resolver — stub returns "PASS"
-        result = vm.run(inputs={"claims": "some claims"})
-        assert result == "PASS"
