@@ -1,0 +1,2 @@
+template: "Verify that all product references in the claims exist as real, known products. Check brand names, model numbers, and product categories."
+model: claude-sonnet-4-20250514

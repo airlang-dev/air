@@ -1,0 +1,27 @@
+{
+  "air_graph_version": "0.2",
+  "workflow": "SimpleVerify",
+  "entry": "start",
+  "params": [
+    {"name": "claims", "type": "Claim[]"}
+  ],
+  "nodes": {
+    "start": {
+      "operations": [
+        {
+          "type": "verify",
+          "inputs": ["claims"],
+          "outputs": [{"name": "v1", "type": "Verdict"}],
+          "params": {"rule": "product_existence"}
+        },
+        {
+          "type": "return",
+          "inputs": ["v1"],
+          "outputs": [],
+          "params": {}
+        }
+      ],
+      "terminal": true
+    }
+  }
+}

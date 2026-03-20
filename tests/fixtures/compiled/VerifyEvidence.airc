@@ -1,0 +1,36 @@
+{
+  "air_graph_version": "0.2",
+  "workflow": "VerifyEvidence",
+  "entry": "start",
+  "params": [
+    {"name": "claims", "type": "Claim[]"}
+  ],
+  "nodes": {
+    "start": {
+      "operations": [
+        {
+          "type": "verify",
+          "inputs": ["claims"],
+          "outputs": [
+            {"name": "verdict", "type": "Verdict"},
+            {"name": "evidence", "type": "Evidence"}
+          ],
+          "params": {"rule": "product_existence"}
+        },
+        {
+          "type": "return",
+          "inputs": [],
+          "outputs": [],
+          "params": {
+            "type": "Result",
+            "fields": {
+              "verdict": "verdict",
+              "evidence": "evidence"
+            }
+          }
+        }
+      ],
+      "terminal": true
+    }
+  }
+}

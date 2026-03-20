@@ -19,6 +19,14 @@ class PromptAsset:
     model: str | None = None
 
 
+@dataclass
+class RuleAsset:
+    """A resolved rule asset with template text and optional model binding."""
+
+    template: str
+    model: str | None = None
+
+
 class AssetResolver:
     """Resolves asset names to content from a project directory."""
 
@@ -59,8 +67,21 @@ class AssetResolver:
         return getattr(module, name, None)
 
     def resolve_rule(self, name):
-        """Resolve a rule name to content. Not implemented in Phase 1."""
-        raise NotImplementedError("Rule resolution is not yet implemented")
+        """Resolve a rule name to a RuleAsset.
+
+        Looks for rules/{name}.yaml (structured) or rules/{name}.md (plain).
+        """
+        rules_dir = os.path.join(self._base_dir, "rules")
+
+        yaml_path = os.path.join(rules_dir, f"{name}.yaml")
+        if os.path.exists(yaml_path):
+            return self._load_yaml_rule(yaml_path)
+
+        md_path = os.path.join(rules_dir, f"{name}.md")
+        if os.path.exists(md_path):
+            return self._load_plain_rule(md_path)
+
+        return None
 
     def _load_yaml_prompt(self, path):
         with open(path) as f:
@@ -74,3 +95,16 @@ class AssetResolver:
         with open(path) as f:
             template = f.read()
         return PromptAsset(template=template)
+
+    def _load_yaml_rule(self, path):
+        with open(path) as f:
+            data = yaml.safe_load(f)
+        return RuleAsset(
+            template=data.get("template", ""),
+            model=data.get("model"),
+        )
+
+    def _load_plain_rule(self, path):
+        with open(path) as f:
+            template = f.read()
+        return RuleAsset(template=template)

@@ -115,3 +115,63 @@ class TestTransformExecution:
         result = vm.run(inputs={"article": "Some text"})
 
         assert result == ["claim"]
+
+
+class TestGovernanceExecution:
+
+    def test_verify_via_llm(self):
+        """Verify calls litellm with resolved rule through the VM."""
+        vm = AgentVM.load(COMPILED_DIR / "SimpleVerify.airc")
+        vm.asset_resolver = AssetResolver(ASSETS_DIR)
+
+        with patch("runtime.verify_executor.litellm.completion") as mock:
+            mock.return_value = _mock_litellm_response(
+                "PASS\n\nAll products are valid."
+            )
+            result = vm.run(inputs={"claims": "product A exists"})
+
+        assert result == "PASS"
+        mock.assert_called_once()
+
+    def test_verify_with_evidence(self):
+        """Verify with two outputs stores both verdict and evidence."""
+        vm = AgentVM.load(COMPILED_DIR / "VerifyEvidence.airc")
+        vm.asset_resolver = AssetResolver(ASSETS_DIR)
+
+        with patch("runtime.verify_executor.litellm.completion") as mock:
+            mock.return_value = _mock_litellm_response(
+                "FAIL\n\nProduct XYZ-9000 not found."
+            )
+            result = vm.run(inputs={"claims": "XYZ-9000 is great"})
+
+        assert result["fields"]["verdict"] == "FAIL"
+        assert "XYZ-9000 not found" in result["fields"]["evidence"]
+
+    def test_governance_chain_proceed(self):
+        """Full chain: verify→aggregate→gate routes to PROCEED."""
+        vm = AgentVM.load(COMPILED_DIR / "GovernanceChain.airc")
+        vm.asset_resolver = AssetResolver(ASSETS_DIR)
+
+        with patch("runtime.verify_executor.litellm.completion") as mock:
+            mock.return_value = _mock_litellm_response("PASS\n\nLooks good.")
+            result = vm.run(inputs={"claims": "valid claims"})
+
+        assert result == "PROCEED"
+
+    def test_governance_chain_escalate(self):
+        """Full chain: FAIL verdicts route to ESCALATE."""
+        vm = AgentVM.load(COMPILED_DIR / "GovernanceChain.airc")
+        vm.asset_resolver = AssetResolver(ASSETS_DIR)
+
+        with patch("runtime.verify_executor.litellm.completion") as mock:
+            mock.return_value = _mock_litellm_response("FAIL\n\nBad claims.")
+            result = vm.run(inputs={"claims": "bad claims"})
+
+        assert result == "ESCALATE"
+
+    def test_verify_falls_back_without_resolver(self):
+        """Without an asset resolver, verify falls back to stub."""
+        vm = AgentVM.load(COMPILED_DIR / "SimpleVerify.airc")
+        # No asset_resolver — stub returns "PASS"
+        result = vm.run(inputs={"claims": "some claims"})
+        assert result == "PASS"

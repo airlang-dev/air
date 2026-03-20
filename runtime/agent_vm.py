@@ -7,18 +7,17 @@ import litellm
 from runtime.adapters import (
     llm_adapter,
     transform_adapter,
-    verify_adapter,
     decision_adapter,
-    aggregate_adapter,
-    gate_adapter,
     session_adapter,
     map_adapter,
 )
 from runtime.config import RuntimeConfig
 from runtime.edge_resolver import EdgeResolver
+from runtime.governance import aggregate, gate
 from runtime.tracer import Tracer
 from runtime.transform_executor import TransformExecutor
 from runtime.variable_scope import VariableScope
+from runtime.verify_executor import VerifyExecutor
 
 
 class AgentVM:
@@ -129,17 +128,18 @@ class AgentVM:
 
     def _execute_verify(self, params, inputs, out_names):
         input_val = self._vars.resolve(inputs[0])
-        rule = params["rule"]
-        return verify_adapter(input_val, rule)
+        rule_name = params["rule"]
+        executor = VerifyExecutor(self.asset_resolver, self.config)
+        return executor.execute(input_val, rule_name)
 
     def _execute_aggregate(self, params, inputs, out_names):
-        values = [self._vars.resolve(i) for i in inputs]
+        verdicts = [self._vars.resolve(i) for i in inputs]
         strategy = params["strategy"]
-        return aggregate_adapter(values, strategy)
+        return aggregate(verdicts, strategy)
 
     def _execute_gate(self, params, inputs, out_names):
         input_val = self._vars.resolve(inputs[0])
-        return gate_adapter(input_val)
+        return gate(input_val)
 
     def _execute_decide(self, params, inputs, out_names):
         input_val = self._vars.get(inputs[0]) if inputs else None

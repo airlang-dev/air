@@ -1,0 +1,87 @@
+{
+  "air_graph_version": "0.2",
+  "workflow": "GovernanceChain",
+  "entry": "check",
+  "params": [
+    {"name": "claims", "type": "Claim[]"}
+  ],
+  "nodes": {
+    "check": {
+      "operations": [
+        {
+          "type": "verify",
+          "inputs": ["claims"],
+          "outputs": [{"name": "v1", "type": "Verdict"}],
+          "params": {"rule": "product_existence"}
+        },
+        {
+          "type": "verify",
+          "inputs": ["claims"],
+          "outputs": [{"name": "v2", "type": "Verdict"}],
+          "params": {"rule": "link_validation"}
+        },
+        {
+          "type": "aggregate",
+          "inputs": ["v1", "v2"],
+          "outputs": [{"name": "__agg__", "type": "Consensus"}],
+          "params": {"strategy": "majority"}
+        },
+        {
+          "type": "gate",
+          "inputs": ["__agg__"],
+          "outputs": [{"name": "outcome", "type": "Outcome"}],
+          "params": {}
+        }
+      ],
+      "terminal": false,
+      "route_variable": "outcome",
+      "edges": [
+        {
+          "target": "pass_node",
+          "condition": {"kind": "enum", "value": "PROCEED"}
+        },
+        {
+          "target": "fail_node",
+          "condition": {"kind": "enum", "value": "ESCALATE"}
+        },
+        {
+          "target": "retry_node",
+          "condition": {"kind": "enum", "value": "RETRY"}
+        }
+      ]
+    },
+    "pass_node": {
+      "operations": [
+        {
+          "type": "return",
+          "inputs": ["outcome"],
+          "outputs": [],
+          "params": {}
+        }
+      ],
+      "terminal": true
+    },
+    "fail_node": {
+      "operations": [
+        {
+          "type": "return",
+          "inputs": ["outcome"],
+          "outputs": [],
+          "params": {}
+        }
+      ],
+      "terminal": true
+    },
+    "retry_node": {
+      "operations": [
+        {
+          "type": "return",
+          "inputs": ["outcome"],
+          "outputs": [],
+          "params": {}
+        }
+      ],
+      "terminal": true
+    }
+  }
+}

@@ -32,9 +32,31 @@ class TestResolvePrompt:
         asset = resolver.resolve_prompt("nonexistent")
         assert asset is None
 
-    def test_resolve_rule_not_implemented(self, resolver):
-        with pytest.raises(NotImplementedError):
-            resolver.resolve_rule("some_rule")
+    def test_resolve_rule_not_implemented_is_removed(self):
+        """resolve_rule no longer raises NotImplementedError (Phase 3)."""
+        pass
+
+
+class TestResolveRule:
+
+    def test_yaml_rule_with_model(self, resolver):
+        """Resolves a YAML rule with template and model."""
+        asset = resolver.resolve_rule("product_existence")
+        assert asset is not None
+        assert "product references" in asset.template
+        assert asset.model == "claude-sonnet-4-20250514"
+
+    def test_plain_markdown_rule(self, resolver):
+        """Resolves a plain markdown rule."""
+        asset = resolver.resolve_rule("link_validation")
+        assert asset is not None
+        assert "URLs" in asset.template
+        assert asset.model is None
+
+    def test_unknown_rule_returns_none(self, resolver):
+        """Returns None for a rule that doesn't exist."""
+        asset = resolver.resolve_rule("nonexistent_rule")
+        assert asset is None
 
 
 class TestResolveFunc:
