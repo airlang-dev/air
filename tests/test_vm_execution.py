@@ -3,6 +3,8 @@
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
+import pytest
+
 from runtime.agent_vm import AgentVM
 from runtime.asset_resolver import AssetResolver
 
@@ -17,25 +19,21 @@ def _mock_litellm_response(content):
     return response
 
 
-def test_vm_executes_workflow():
-    """The VM loads a compiled .airc, runs it with inputs,
-    and returns a result."""
-    vm = AgentVM.load(COMPILED_DIR / "FactCheckedPublish.airc")
-
-    result = vm.run(inputs={"content": "Some article text"})
-
-    assert result is not None
+def test_vm_requires_asset_resolver():
+    """The VM raises when no asset resolver is configured."""
+    vm = AgentVM.load(COMPILED_DIR / "SimpleLLM.airc")
+    with pytest.raises(RuntimeError, match="asset_resolver is required"):
+        vm.run(inputs={"content": "Some article text"})
 
 
 class TestLLMExecution:
 
     def test_llm_calls_litellm(self):
-        """When assets are configured, the VM calls litellm.completion()
-        instead of returning stub strings."""
+        """The VM calls litellm.completion() with resolved prompt."""
         vm = AgentVM.load(COMPILED_DIR / "SimpleLLM.airc")
         vm.asset_resolver = AssetResolver(ASSETS_DIR)
 
-        with patch("runtime.agent_vm.litellm.completion") as mock_completion:
+        with patch("runtime.llm_executor.litellm.completion") as mock_completion:
             mock_completion.return_value = _mock_litellm_response(
                 "A concise summary."
             )
@@ -57,7 +55,7 @@ class TestLLMExecution:
             "extract_claims"
         )
 
-        with patch("runtime.agent_vm.litellm.completion") as mock_completion:
+        with patch("runtime.llm_executor.litellm.completion") as mock_completion:
             mock_completion.return_value = _mock_litellm_response(
                 "Claims extracted."
             )
@@ -66,13 +64,16 @@ class TestLLMExecution:
         call_kwargs = mock_completion.call_args
         assert call_kwargs.kwargs.get("model") == "claude-sonnet-4-20250514"
 
-    def test_llm_falls_back_to_adapter_without_assets(self):
-        """Without an asset resolver, the VM falls back to stub adapters."""
+    def test_llm_raises_on_missing_prompt(self):
+        """Raises RuntimeError when prompt asset not found."""
         vm = AgentVM.load(COMPILED_DIR / "SimpleLLM.airc")
-        # No asset_resolver set — should use adapter fallback
-        result = vm.run(inputs={"content": "Some article text"})
+        vm.asset_resolver = AssetResolver(ASSETS_DIR)
+        vm._graph["nodes"]["start"]["operations"][0]["params"]["prompt"] = (
+            "nonexistent"
+        )
 
-        assert result == "[LLM:summarize]"
+        with pytest.raises(RuntimeError, match="prompt asset 'nonexistent' not found"):
+            vm.run(inputs={"content": "Some text"})
 
 
 class TestTransformExecution:

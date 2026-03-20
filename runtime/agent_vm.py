@@ -2,18 +2,17 @@
 
 import json
 
-import litellm
-
 from runtime.adapters import (
-    llm_adapter,
     transform_adapter,
     decision_adapter,
     session_adapter,
     map_adapter,
 )
+from runtime.aggregate_executor import AggregateExecutor
 from runtime.config import RuntimeConfig
 from runtime.edge_resolver import EdgeResolver
-from runtime.governance import aggregate, gate
+from runtime.gate_executor import GateExecutor
+from runtime.llm_executor import LLMExecutor
 from runtime.tracer import Tracer
 from runtime.transform_executor import TransformExecutor
 from runtime.variable_scope import VariableScope
@@ -102,24 +101,8 @@ class AgentVM:
     def _execute_llm(self, params, inputs, out_names):
         prompt_name = params["prompt"]
         input_vals = [self._vars.get(i) for i in inputs]
-
-        if self.asset_resolver is None:
-            return llm_adapter(prompt_name, *input_vals)
-
-        asset = self.asset_resolver.resolve_prompt(prompt_name)
-        if asset is None:
-            return llm_adapter(prompt_name, *input_vals)
-
-        model = asset.model or self.config.default_model
-        user_content = asset.template
-        for val in input_vals:
-            user_content += f"\n\n{val}"
-
-        response = litellm.completion(
-            model=model,
-            messages=[{"role": "user", "content": user_content}],
-        )
-        return response.choices[0].message.content
+        executor = LLMExecutor(self.asset_resolver, self.config)
+        return executor.execute(prompt_name, input_vals)
 
     def _execute_transform(self, params, inputs, out_names):
         input_val = self._vars.resolve(inputs[0])
@@ -135,11 +118,11 @@ class AgentVM:
     def _execute_aggregate(self, params, inputs, out_names):
         verdicts = [self._vars.resolve(i) for i in inputs]
         strategy = params["strategy"]
-        return aggregate(verdicts, strategy)
+        return AggregateExecutor().execute(verdicts, strategy)
 
     def _execute_gate(self, params, inputs, out_names):
         input_val = self._vars.resolve(inputs[0])
-        return gate(input_val)
+        return GateExecutor().execute(input_val)
 
     def _execute_decide(self, params, inputs, out_names):
         input_val = self._vars.get(inputs[0]) if inputs else None

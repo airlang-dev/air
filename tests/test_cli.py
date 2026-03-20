@@ -2,10 +2,19 @@
 
 from argparse import Namespace
 from pathlib import Path
+from unittest.mock import patch, MagicMock
 
 from compiler.cli import run_workflow
 
 COMPILED_DIR = Path(__file__).resolve().parent / "fixtures" / "compiled"
+ASSETS_DIR = str(Path(__file__).resolve().parent / "fixtures" / "assets")
+
+
+def _mock_litellm_response(content):
+    response = MagicMock()
+    response.choices = [MagicMock()]
+    response.choices[0].message.content = content
+    return response
 
 
 class TestAirRun:
@@ -17,13 +26,15 @@ class TestAirRun:
             input=["content=test article"],
             input_file=None,
             config=None,
-            assets=None,
+            assets=ASSETS_DIR,
         )
-        run_workflow(args)
+        with patch("runtime.llm_executor.litellm.completion") as mock:
+            mock.return_value = _mock_litellm_response("A summary.")
+            run_workflow(args)
 
         captured = capsys.readouterr()
         assert "[VM] result:" in captured.out
-        assert "LLM" in captured.out
+        assert "A summary." in captured.out
 
     def test_run_parses_multiple_inputs(self, capsys):
         args = Namespace(
@@ -31,9 +42,11 @@ class TestAirRun:
             input=["content=hello", "extra=world"],
             input_file=None,
             config=None,
-            assets=None,
+            assets=ASSETS_DIR,
         )
-        run_workflow(args)
+        with patch("runtime.llm_executor.litellm.completion") as mock:
+            mock.return_value = _mock_litellm_response("Result.")
+            run_workflow(args)
 
         captured = capsys.readouterr()
         assert "[VM] result:" in captured.out
