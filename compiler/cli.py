@@ -40,6 +40,11 @@ def main():
     run_p.add_argument(
         "--assets", help="Path to assets directory (default: .airc file directory)"
     )
+    run_p.add_argument(
+        "--callback",
+        default="runtime.callbacks:stdin_callback",
+        help="Human callback as module:function (default: runtime.callbacks:stdin_callback)",
+    )
 
     args = parser.parse_args()
 
@@ -143,7 +148,13 @@ def run_workflow(args):
     from runtime.asset_resolver import AssetResolver
     from runtime.config import RuntimeConfig
 
-    config = RuntimeConfig.from_file(args.config) if args.config else None
+    config = RuntimeConfig.from_file(args.config) if args.config else RuntimeConfig()
+
+    module_path, _, func_name = args.callback.rpartition(":")
+    import importlib
+
+    mod = importlib.import_module(module_path)
+    config.human_callback = getattr(mod, func_name)
 
     if args.assets:
         asset_resolver = AssetResolver(args.assets)

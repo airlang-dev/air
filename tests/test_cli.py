@@ -27,6 +27,7 @@ class TestAirRun:
             input_file=None,
             config=None,
             assets=ASSETS_DIR,
+            callback="runtime.callbacks:stdin_callback",
         )
         with patch("runtime.llm_utils.litellm.completion") as mock:
             mock.return_value = _mock_litellm_response("A summary.")
@@ -43,6 +44,7 @@ class TestAirRun:
             input_file=None,
             config=None,
             assets=ASSETS_DIR,
+            callback="runtime.callbacks:stdin_callback",
         )
         with patch("runtime.llm_utils.litellm.completion") as mock:
             mock.return_value = _mock_litellm_response("Result.")
