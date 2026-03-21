@@ -22,12 +22,11 @@ class TestLLMExecution:
 
     def test_llm_calls_litellm(self):
         """The VM calls litellm.completion() with resolved prompt."""
-        vm = AgentVM.load(COMPILED_DIR / "SimpleLLM.airc", RESOLVER)
+        vm = AgentVM(asset_resolver=RESOLVER)
+        vm.load(COMPILED_DIR / "SimpleLLM.airc")
 
         with patch("runtime.llm_executor.litellm.completion") as mock_completion:
-            mock_completion.return_value = _mock_litellm_response(
-                "A concise summary."
-            )
+            mock_completion.return_value = _mock_litellm_response("A concise summary.")
             result = vm.run(inputs={"content": "Some article text"})
 
         assert result == "A concise summary."
@@ -38,17 +37,18 @@ class TestLLMExecution:
 
     def test_llm_uses_model_from_prompt_asset(self):
         """The model specified in a YAML prompt asset is passed to litellm."""
-        vm = AgentVM.load(COMPILED_DIR / "SimpleLLM.airc", RESOLVER)
+        import json
+
+        with open(COMPILED_DIR / "SimpleLLM.airc") as f:
+            graph = json.load(f)
 
         # Use extract_claims which has model: claude-sonnet-4-20250514
-        vm._graph["nodes"]["start"]["operations"][0]["params"]["prompt"] = (
-            "extract_claims"
-        )
+        graph["nodes"]["start"]["operations"][0]["params"]["prompt"] = "extract_claims"
+        vm = AgentVM(asset_resolver=RESOLVER)
+        vm.load(graph)
 
         with patch("runtime.llm_executor.litellm.completion") as mock_completion:
-            mock_completion.return_value = _mock_litellm_response(
-                "Claims extracted."
-            )
+            mock_completion.return_value = _mock_litellm_response("Claims extracted.")
             vm.run(inputs={"content": "Some text"})
 
         call_kwargs = mock_completion.call_args
@@ -59,7 +59,8 @@ class TestTransformExecution:
 
     def test_llm_transform_end_to_end(self):
         """LLM transform calls litellm through the VM."""
-        vm = AgentVM.load(COMPILED_DIR / "TransformLLM.airc", RESOLVER)
+        vm = AgentVM(asset_resolver=RESOLVER)
+        vm.load(COMPILED_DIR / "TransformLLM.airc")
 
         with patch("runtime.transform_executor.litellm.completion") as mock:
             mock.return_value = _mock_litellm_response('["claim1", "claim2"]')
@@ -70,7 +71,8 @@ class TestTransformExecution:
 
     def test_func_transform_end_to_end(self):
         """Function transform resolves and executes through the VM."""
-        vm = AgentVM.load(COMPILED_DIR / "TransformFunc.airc", RESOLVER)
+        vm = AgentVM(asset_resolver=RESOLVER)
+        vm.load(COMPILED_DIR / "TransformFunc.airc")
 
         result = vm.run(inputs={"text": "hello world"})
 
@@ -79,7 +81,8 @@ class TestTransformExecution:
 
     def test_schema_coercion_end_to_end(self):
         """Schema coercion parses JSON through the VM."""
-        vm = AgentVM.load(COMPILED_DIR / "TransformCoerce.airc", RESOLVER)
+        vm = AgentVM(asset_resolver=RESOLVER)
+        vm.load(COMPILED_DIR / "TransformCoerce.airc")
 
         result = vm.run(inputs={"data": "[1, 2, 3]"})
 
@@ -90,7 +93,8 @@ class TestGovernanceExecution:
 
     def test_verify_via_llm(self):
         """Verify calls litellm with resolved rule through the VM."""
-        vm = AgentVM.load(COMPILED_DIR / "SimpleVerify.airc", RESOLVER)
+        vm = AgentVM(asset_resolver=RESOLVER)
+        vm.load(COMPILED_DIR / "SimpleVerify.airc")
 
         with patch("runtime.verify_executor.litellm.completion") as mock:
             mock.return_value = _mock_litellm_response(
@@ -103,7 +107,8 @@ class TestGovernanceExecution:
 
     def test_verify_with_evidence(self):
         """Verify with two outputs stores both verdict and evidence."""
-        vm = AgentVM.load(COMPILED_DIR / "VerifyEvidence.airc", RESOLVER)
+        vm = AgentVM(asset_resolver=RESOLVER)
+        vm.load(COMPILED_DIR / "VerifyEvidence.airc")
 
         with patch("runtime.verify_executor.litellm.completion") as mock:
             mock.return_value = _mock_litellm_response(
@@ -116,7 +121,8 @@ class TestGovernanceExecution:
 
     def test_governance_chain_proceed(self):
         """Full chain: verify→aggregate→gate routes to PROCEED."""
-        vm = AgentVM.load(COMPILED_DIR / "GovernanceChain.airc", RESOLVER)
+        vm = AgentVM(asset_resolver=RESOLVER)
+        vm.load(COMPILED_DIR / "GovernanceChain.airc")
 
         with patch("runtime.verify_executor.litellm.completion") as mock:
             mock.return_value = _mock_litellm_response("PASS\n\nLooks good.")
@@ -126,7 +132,8 @@ class TestGovernanceExecution:
 
     def test_governance_chain_escalate(self):
         """Full chain: FAIL verdicts route to ESCALATE."""
-        vm = AgentVM.load(COMPILED_DIR / "GovernanceChain.airc", RESOLVER)
+        vm = AgentVM(asset_resolver=RESOLVER)
+        vm.load(COMPILED_DIR / "GovernanceChain.airc")
 
         with patch("runtime.verify_executor.litellm.completion") as mock:
             mock.return_value = _mock_litellm_response("FAIL\n\nBad claims.")

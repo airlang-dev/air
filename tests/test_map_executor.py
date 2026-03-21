@@ -1,69 +1,78 @@
 """Tests for MapExecutor."""
 
 import pytest
-from unittest.mock import MagicMock
-
+from unittest.mock import MagicMock, patch
 from runtime.map_executor import MapExecutor
 
 
-class MockAgentVM:
-    def __init__(self, should_fail_on=None):
-        self._should_fail_on = should_fail_on or []
-
-    def run_workflow(self, workflow_name, inputs=None):
-        item = inputs.get("item") if inputs else None
-        if item in self._should_fail_on:
-            return {"type": "Fault", "reason": f"Failed on {item}"}
-        return {"type": "Result", "data": f"Processed {item}"}
+@pytest.fixture
+def mock_vm():
+    vm = MagicMock()
+    vm.get_workflow.return_value = {"workflow": "sub_logic"}
+    return vm
 
 
-class TestMapExecutor:
+@patch("runtime.workflow_runner.WorkflowRunner")
+def test_map_sequential(mock_runner_class, mock_vm):
+    mock_runner = MagicMock()
+    mock_runner.run.side_effect = lambda inputs: inputs["item"] * 2
+    mock_runner_class.return_value = mock_runner
 
-    def test_map_sequential_all_success(self):
-        vm = MockAgentVM()
-        executor = MapExecutor(vm)
-        
-        result = executor.execute([1, 2, 3], "TestWorkflow", concurrency=1, on_error="halt")
-        
-        assert len(result) == 3
-        assert result[0]["data"] == "Processed 1"
-        assert result[1]["data"] == "Processed 2"
-        assert result[2]["data"] == "Processed 3"
+    executor = MapExecutor(mock_vm)
+    results = executor.execute([1, 2, 3], "sub_logic")
+    assert results == [2, 4, 6]
+    assert mock_runner_class.call_count == 3
 
-    def test_map_halt_on_error(self):
-        vm = MockAgentVM(should_fail_on=[2])
-        executor = MapExecutor(vm)
-        
-        result = executor.execute([1, 2, 3], "TestWorkflow", concurrency=1, on_error="halt")
-        
-        assert result["type"] == "Fault"
-        assert "Failed on 2" in result["reason"]
 
-    def test_map_skip_on_error(self):
-        vm = MockAgentVM(should_fail_on=[2])
-        executor = MapExecutor(vm)
-        
-        result = executor.execute([1, 2, 3], "TestWorkflow", concurrency=1, on_error="skip")
-        
-        assert len(result) == 2
-        assert result[0]["data"] == "Processed 1"
-        assert result[1]["data"] == "Processed 3"
+@patch("runtime.workflow_runner.WorkflowRunner")
+def test_map_concurrent(mock_runner_class, mock_vm):
+    mock_runner = MagicMock()
+    mock_runner.run.side_effect = lambda inputs: inputs["item"] * 2
+    mock_runner_class.return_value = mock_runner
 
-    def test_map_collect_on_error(self):
-        vm = MockAgentVM(should_fail_on=[2])
-        executor = MapExecutor(vm)
-        
-        result = executor.execute([1, 2, 3], "TestWorkflow", concurrency=1, on_error="collect")
-        
-        assert len(result) == 3
-        assert result[0]["type"] == "Result"
-        assert result[1]["type"] == "Fault"
-        assert result[2]["type"] == "Result"
+    executor = MapExecutor(mock_vm)
+    results = executor.execute([1, 2, 3], "sub_logic", concurrency=3)
+    assert results == [2, 4, 6]
 
-    def test_map_concurrent(self):
-        vm = MockAgentVM()
-        executor = MapExecutor(vm)
-        
-        result = executor.execute([1, 2, 3, 4, 5], "TestWorkflow", concurrency=10, on_error="halt")
-        
-        assert len(result) == 5
+
+@patch("runtime.workflow_runner.WorkflowRunner")
+def test_map_error_halt(mock_runner_class, mock_vm):
+    fault = {"type": "Fault", "message": "Failed item"}
+    mock_runner = MagicMock()
+    mock_runner.run.side_effect = lambda inputs: (
+        fault if inputs["item"] == 2 else inputs["item"] * 2
+    )
+    mock_runner_class.return_value = mock_runner
+
+    executor = MapExecutor(mock_vm)
+    results = executor.execute([1, 2, 3], "sub_logic", on_error="halt")
+    assert results == fault
+    assert mock_runner_class.call_count == 2
+
+
+@patch("runtime.workflow_runner.WorkflowRunner")
+def test_map_error_skip(mock_runner_class, mock_vm):
+    fault = {"type": "Fault", "message": "Failed item"}
+    mock_runner = MagicMock()
+    mock_runner.run.side_effect = lambda inputs: (
+        fault if inputs["item"] == 2 else inputs["item"] * 2
+    )
+    mock_runner_class.return_value = mock_runner
+
+    executor = MapExecutor(mock_vm)
+    results = executor.execute([1, 2, 3], "sub_logic", on_error="skip")
+    assert results == [2, 6]
+
+
+@patch("runtime.workflow_runner.WorkflowRunner")
+def test_map_error_collect(mock_runner_class, mock_vm):
+    fault = {"type": "Fault", "message": "Failed item"}
+    mock_runner = MagicMock()
+    mock_runner.run.side_effect = lambda inputs: (
+        fault if inputs["item"] == 2 else inputs["item"] * 2
+    )
+    mock_runner_class.return_value = mock_runner
+
+    executor = MapExecutor(mock_vm)
+    results = executor.execute([1, 2, 3], "sub_logic", on_error="collect")
+    assert results == [2, fault, 6]

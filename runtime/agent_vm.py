@@ -2,55 +2,47 @@
 
 Loads and executes AIR Graph (.airc) workflows."""
 
-import json
 import os
 
 from runtime.asset_resolver import AssetResolver
 from runtime.config import RuntimeConfig
+from runtime.workflow_loader import WorkflowLoader
 from runtime.workflow_runner import WorkflowRunner
 
 
 class AgentVM:
     """The long-lived virtual machine environment for executing workflows."""
 
-    def __init__(self, graph=None, asset_resolver=None, config=None):
-        self._default_graph = graph
+    def __init__(self, asset_resolver=None, config=None):
         self.asset_resolver = asset_resolver or AssetResolver(".")
         self.config = config or RuntimeConfig()
+        self._default_graph = None
         self._cache = {}
 
     @property
-    def _graph(self):
-        return self._default_graph
+    def workflow_name(self):
+        return (
+            self._default_graph.get("workflow", "Unknown")
+            if self._default_graph
+            else "None"
+        )
 
-    @property
-    def _nodes(self):
-        return self._default_graph.get("nodes", {}) if self._default_graph else {}
+    def load(self, workflow_source):
+        """Load and build the runtime workflow graph.
 
-    @classmethod
-    def load(cls, path, asset_resolver=None, config=None):
-        """Initialize an AgentVM instance from a compiled workflow."""
-        if asset_resolver is None:
-            airc_dir = os.path.dirname(os.path.abspath(path))
-            asset_resolver = AssetResolver(airc_dir)
+        Args:
+            workflow_source: A compiled workflow string path OR a raw dictionary.
+        """
+        loader = WorkflowLoader(self.asset_resolver, self.config)
+        self._default_graph, self._cache = loader.build(workflow_source)
 
-        with open(path) as f:
-            graph = json.load(f)
-
-        vm = cls(graph, asset_resolver, config)
-        vm._cache[path] = graph
-        return vm
-
-    def run_workflow(self, workflow_name, inputs=None):
-        """Execute a named sub-workflow."""
-        path = os.path.join(self.asset_resolver._base_dir, f"{workflow_name}.airc")
-        if path not in self._cache:
-            with open(path) as f:
-                self._cache[path] = json.load(f)
-
-        graph = self._cache[path]
-        runner = WorkflowRunner(self, graph)
-        return runner.run(inputs)
+    def get_workflow(self, name):
+        """Retrieve a fully loaded and validated sub-workflow from cache."""
+        if name not in self._cache:
+            raise RuntimeError(
+                f"Workflow '{name}' not found. Was it referenced statically?"
+            )
+        return self._cache[name]
 
     def run(self, inputs=None):
         """Execute the primary workflow."""

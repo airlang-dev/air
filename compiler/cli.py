@@ -34,7 +34,9 @@ def main():
     )
     run_p.add_argument("--input-file", help="JSON file with workflow inputs")
     run_p.add_argument("--config", help="Path to air.config.yaml")
-    run_p.add_argument("--assets", help="Path to assets directory (default: .airc file directory)")
+    run_p.add_argument(
+        "--assets", help="Path to assets directory (default: .airc file directory)"
+    )
 
     args = parser.parse_args()
 
@@ -139,8 +141,15 @@ def run_workflow(args):
     from runtime.config import RuntimeConfig
 
     config = RuntimeConfig.from_file(args.config) if args.config else None
-    asset_resolver = AssetResolver(args.assets) if args.assets else None
-    vm = AgentVM.load(args.airc_file, asset_resolver, config)
+
+    if args.assets:
+        asset_resolver = AssetResolver(args.assets)
+    else:
+        airc_dir = os.path.dirname(os.path.abspath(args.airc_file))
+        asset_resolver = AssetResolver(airc_dir)
+
+    vm = AgentVM(asset_resolver=asset_resolver, config=config)
+    vm.load(args.airc_file)
 
     inputs = {}
     if args.input_file:
@@ -150,7 +159,7 @@ def run_workflow(args):
         key, _, value = kv.partition("=")
         inputs[key] = value
 
-    print(f"[VM] executing workflow: {vm._graph['workflow']}")
+    print(f"[VM] executing workflow: {vm.workflow_name}")
     result = vm.run(inputs=inputs if inputs else None)
     print(f"\n[VM] result: {result}")
 

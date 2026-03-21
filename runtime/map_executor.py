@@ -1,6 +1,6 @@
 """Map execution for the AIR Agent VM.
 
-Executes a named sub-workflow repetitively over a collection.
+Execute a sub-workflow over a collection.
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -14,9 +14,12 @@ class MapExecutor:
 
     def execute(self, collection, workflow_name, concurrency=1, on_error="halt"):
         """Run the workflow for each item in the collection."""
-        
+        from runtime.workflow_runner import WorkflowRunner
+
         def _process_item(item):
-            return self._vm.run_workflow(workflow_name, inputs={"item": item})
+            graph = self._vm.get_workflow(workflow_name)
+            runner = WorkflowRunner(self._vm, graph)
+            return runner.run(inputs={"item": item})
 
         raw_results = []
         if concurrency > 1:

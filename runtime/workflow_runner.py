@@ -1,7 +1,6 @@
 """Execution environment for a single AIR workflow invocation."""
 
 from runtime.adapters import (
-    decision_adapter,
     session_adapter,
 )
 from runtime.aggregate_executor import AggregateExecutor
@@ -9,6 +8,7 @@ from runtime.edge_resolver import EdgeResolver
 from runtime.gate_executor import GateExecutor
 from runtime.llm_executor import LLMExecutor
 from runtime.map_executor import MapExecutor
+from runtime.decision_executor import DecisionExecutor
 from runtime.tracer import Tracer
 from runtime.transform_executor import TransformExecutor
 from runtime.variable_scope import VariableScope
@@ -116,7 +116,8 @@ class WorkflowRunner:
     def _execute_decide(self, params, inputs, out_names):
         input_val = self._vars.get(inputs[0]) if inputs else None
         provider = params["provider"]
-        msg, outcome = decision_adapter(provider, input_val)
+        executor = DecisionExecutor(self.vm.asset_resolver, self.vm.config)
+        msg, outcome = executor.execute(provider, input_val)
         if len(out_names) >= 2:
             return msg, outcome
         return outcome
@@ -157,7 +158,7 @@ class WorkflowRunner:
         collection = self._vars.get(inputs[0]) if inputs else []
         concurrency = params.get("concurrency", 1)
         on_error = params.get("on_error", "halt")
-        
+
         executor = MapExecutor(self.vm)
         return executor.execute(collection, workflow, concurrency, on_error)
 
