@@ -268,6 +268,7 @@ def _check_expression_refs(expr, defined: set, workflow_names: set = None):
         for arg in expr.args:
             _check_arg_ref(arg, defined)
     elif isinstance(expr, Session):
+        # protocol is an asset name — don't check it
         for arg in expr.args:
             _check_arg_ref(arg, defined)
     elif isinstance(expr, Transform):

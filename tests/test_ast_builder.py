@@ -299,9 +299,9 @@ class TestDecideSession:
         n = find_node(build_fixture(parser, "decide_session"), "session_node")
         s = n.body[0].value
         assert isinstance(s, Session)
+        assert s.protocol == "protocol"
         assert s.args == [
             Identifier("members"),
-            Identifier("protocol"),
             Identifier("history"),
         ]
 

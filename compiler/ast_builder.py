@@ -314,7 +314,14 @@ class ASTBuilder:
 
     def _build_session(self, node: Tree) -> Session:
         args = self._build_arg_list(node)
-        return Session(args=args)
+        protocol_arg = args[1] if len(args) > 1 else None
+        protocol = (
+            protocol_arg.name
+            if isinstance(protocol_arg, Identifier)
+            else str(protocol_arg)
+        )
+        remaining = [args[0]] + args[2:] if args else []
+        return Session(protocol=protocol, args=remaining)
 
     def _build_transform(self, node: Tree) -> Transform:
         input_arg = self._build_arg(node.children[0])

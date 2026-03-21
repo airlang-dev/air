@@ -61,9 +61,10 @@ class TestSessionExecutor:
 
         assert outcome == "PROCEED"
         assert len(history) == 2
-        assert history[0]["role"] == "Analyst"
-        assert "Looks good to me" in history[0]["content"]
-        assert history[1]["role"] == "Reviewer"
+        assert history[0]["role"] == "assistant"
+        assert "[Analyst]" in history[0]["content"]
+        assert history[1]["role"] == "assistant"
+        assert "[Reviewer]" in history[1]["content"]
         assert "I concur" in history[1]["content"]
 
     @patch("runtime.session_executor.call_llm")

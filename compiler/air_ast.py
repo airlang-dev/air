@@ -221,6 +221,7 @@ class Decide(Expression):
 
 @dataclass
 class Session(Expression):
+    protocol: str
     args: list[Arg] = field(default_factory=list)
 
 

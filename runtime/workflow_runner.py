@@ -125,7 +125,7 @@ class WorkflowRunner:
 
         members = self._vars.get(inputs[0]) if len(inputs) > 0 else []
         protocol = params.get("protocol", "")
-        history = self._vars.get(inputs[2]) if len(inputs) > 2 else []
+        history = self._vars.get(inputs[1]) if len(inputs) > 1 else []
 
         executor = SessionExecutor(self.vm.asset_resolver, self.vm.config)
         outcome, updated_history = executor.execute(members, protocol, history)

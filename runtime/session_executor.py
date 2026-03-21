@@ -28,7 +28,7 @@ class SessionExecutor:
 
             move, content = self._parse_move(response, protocol)
             moves.append(move)
-            history.append({"role": member["role"], "content": response})
+            history.append({"role": "assistant", "content": f"[{member['role']}] {response}"})
 
         outcome = self._resolve(moves, protocol)
         return outcome, history
@@ -44,11 +44,17 @@ class SessionExecutor:
         return "\n".join(lines)
 
     def _parse_move(self, response, protocol):
+        moves = protocol["moves"]
         if ":" in response:
             prefix, content = response.split(":", 1)
             prefix = prefix.strip()
-            if prefix in protocol["moves"]:
+            if prefix in moves:
                 return prefix, content.strip()
+        for move in moves:
+            for token in response.split():
+                cleaned = token.strip(".:,;!?")
+                if cleaned == move:
+                    return move, response
         return None, response
 
     def _resolve(self, moves, protocol):

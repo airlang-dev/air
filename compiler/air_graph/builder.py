@@ -238,6 +238,7 @@ def _convert_assign(inst: Assign) -> AirGraphOperation | None:
             type="session",
             inputs=[_arg_to_str(a) for a in expr.args],
             outputs=_typed_outputs(raw, "Session"),
+            params={"protocol": expr.protocol},
         )
     if isinstance(expr, Constructor):
         return AirGraphOperation(
@@ -278,6 +279,7 @@ def _convert_bare_session(inst: Session) -> AirGraphOperation:
         type="session",
         inputs=[_arg_to_str(a) for a in inst.args],
         outputs=[],
+        params={"protocol": inst.protocol},
     )
 
 
