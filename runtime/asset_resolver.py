@@ -83,6 +83,17 @@ class AssetResolver:
 
         return None
 
+    def resolve_protocol(self, name):
+        """Resolve a protocol name to a dictionary.
+
+        Looks for protocols/{name}.yaml.
+        """
+        protocol_path = os.path.join(self._base_dir, "protocols", f"{name}.yaml")
+        if os.path.exists(protocol_path):
+            with open(protocol_path) as f:
+                return yaml.safe_load(f)
+        return None
+
     def _load_yaml_prompt(self, path):
         with open(path) as f:
             data = yaml.safe_load(f)

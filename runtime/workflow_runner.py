@@ -1,8 +1,6 @@
 """Execution environment for a single AIR workflow invocation."""
 
-from runtime.adapters import (
-    session_adapter,
-)
+
 from runtime.aggregate_executor import AggregateExecutor
 from runtime.edge_resolver import EdgeResolver
 from runtime.gate_executor import GateExecutor
@@ -123,8 +121,18 @@ class WorkflowRunner:
         return outcome
 
     def _execute_session(self, params, inputs, out_names):
-        input_vals = [self._vars.get(i) for i in inputs]
-        return session_adapter(*input_vals)
+        from runtime.session_executor import SessionExecutor
+
+        members = self._vars.get(inputs[0]) if len(inputs) > 0 else []
+        protocol = params.get("protocol", "")
+        history = self._vars.get(inputs[2]) if len(inputs) > 2 else []
+
+        executor = SessionExecutor(self.vm.asset_resolver, self.vm.config)
+        outcome, updated_history = executor.execute(members, protocol, history)
+
+        if len(out_names) >= 2:
+            return outcome, updated_history
+        return outcome
 
     def _execute_return(self, params, inputs, out_names):
         fields = params.get("fields", {})
