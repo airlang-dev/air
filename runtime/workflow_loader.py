@@ -18,8 +18,11 @@ class WorkflowLoader:
         cache = {}
         if isinstance(graph_or_path, dict):
             graph = graph_or_path
+            self._airc_dir = None
         else:
-            graph = self._read_file(path=str(graph_or_path))
+            file_path = str(graph_or_path)
+            self._airc_dir = os.path.dirname(os.path.abspath(file_path))
+            graph = self._read_file(path=file_path)
 
         wf_name = graph.get("workflow", "Unnamed")
         cache[wf_name] = graph
@@ -34,7 +37,10 @@ class WorkflowLoader:
             if not os.path.exists(path):
                 raise RuntimeError(f"Workflow file not found: {path}")
         else:
-            path = os.path.join(self._asset_resolver._base_dir, f"{workflow_name}.airc")
+            if self._airc_dir:
+                path = os.path.join(self._airc_dir, f"{workflow_name}.airc")
+            if not path or not os.path.exists(path):
+                path = os.path.join(self._asset_resolver._base_dir, f"{workflow_name}.airc")
             if not os.path.exists(path):
                 return None
 
