@@ -66,6 +66,22 @@ class AssetResolver:
 
         return getattr(module, name, None)
 
+    def resolve_tool(self, name):
+        """Resolve a tool name to a callable.
+
+        Looks for tools/{name}.py and returns the callable named {name},
+        or None if not found.
+        """
+        tool_path = os.path.join(self._base_dir, "tools", f"{name}.py")
+        if not os.path.exists(tool_path):
+            return None
+
+        spec = importlib.util.spec_from_file_location(name, tool_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        return getattr(module, name, None)
+
     def resolve_rule(self, name):
         """Resolve a rule name to a RuleAsset.
 

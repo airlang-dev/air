@@ -158,8 +158,13 @@ class WorkflowRunner:
         return [self._vars.get(i) for i in inputs]
 
     def _execute_tool(self, params, inputs, out_names):
+        from runtime.tool_executor import ToolExecutor
+
         name = params["name"]
-        return f"[TOOL:{name}]"
+        input_vals = [self._vars.get(i) for i in inputs]
+
+        executor = ToolExecutor(self.vm.asset_resolver, self.vm.config)
+        return executor.execute(name, input_vals)
 
     def _execute_map(self, params, inputs, out_names):
         workflow = params.get("workflow", "Unknown")
