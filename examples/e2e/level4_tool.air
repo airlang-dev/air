@@ -1,0 +1,17 @@
+@air 0.2
+
+workflow FetchAndSummarize(url: Message) -> Artifact | Fault:
+
+    node start:
+        article = tool(fetch_article, url)
+
+        route article:
+            Fault: fail
+            else: analyze(article)
+
+    node analyze(article):
+        summary = llm(summarize, article)
+        return Artifact(summary=summary)
+
+    node fail:
+        return Fault(reason="Failed to fetch article")

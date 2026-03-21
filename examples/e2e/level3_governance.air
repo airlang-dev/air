@@ -1,0 +1,25 @@
+@air 0.2
+
+workflow FactChecked(content: Message) -> Artifact | Fault:
+
+    node start:
+        summary = llm(summarize, content)
+        claims = transform(summary) as Claim[] via llm(extract_claims)
+
+        route claims:
+            Fault: fail
+            else: check(claims, summary)
+
+    node check(claims, summary):
+        verdict = verify(claims, fact_check)
+        outcome = gate(verdict)
+
+        route outcome:
+            PROCEED: done(summary, outcome)
+            else: fail
+
+    node done(summary, outcome):
+        return Artifact(status="verified", summary=summary, verification=outcome)
+
+    node fail:
+        return Fault(reason="Verification failed")

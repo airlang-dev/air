@@ -1,0 +1,16 @@
+name: parley_v1
+turn_order: round_robin
+
+moves:
+  - DISCUSS
+  - PROPOSE
+  - AGREE
+  - COUNTER
+  - QUESTION
+
+resolution:
+  strategy: unanimous
+  outcomes:
+    AGREE: PROCEED
+    COUNTER: RETRY
+  default: ESCALATE

@@ -1,0 +1,18 @@
+@air 0.2
+
+workflow ReviewedSummary(content: Message) -> Artifact | Fault:
+
+    node start:
+        summary = llm(summarize, content)
+        msg, outcome = decide(human_reviewer, summary)
+
+        route outcome:
+            PROCEED: publish(summary)
+            RETRY: start
+            else: reject
+
+    node publish(summary):
+        return Artifact(status="approved", summary=summary)
+
+    node reject:
+        return Fault(reason="Rejected by reviewer")

@@ -1,0 +1,7 @@
+@air 0.2
+
+workflow SimpleSummarize(content: Message) -> Artifact:
+
+    node start:
+        summary = llm(summarize, content)
+        return Artifact(summary=summary)

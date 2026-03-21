@@ -1,0 +1,5 @@
+model: gemini/gemini-2.0-flash
+template: |
+  Summarize the following content concisely:
+
+  {{content}}

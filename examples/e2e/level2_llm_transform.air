@@ -1,0 +1,8 @@
+@air 0.2
+
+workflow SummarizeAndExtract(content: Message) -> Artifact:
+
+    node start:
+        summary = llm(summarize, content)
+        claims = transform(summary) as Claim[] via llm(extract_claims)
+        return Artifact(summary=summary, claims=claims)

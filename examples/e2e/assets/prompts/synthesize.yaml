@@ -1,0 +1,6 @@
+model: gpt-4o-mini
+template: |
+  Synthesize the following individual summaries into a single cohesive report.
+  Be concise but comprehensive.
+
+  {{input}}

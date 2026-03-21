@@ -1,0 +1,21 @@
+@air 0.2
+
+workflow SummarizeItem(item: Message) -> Artifact:
+    node start:
+        summary = llm(summarize, item)
+        return Artifact(summary=summary)
+
+workflow BatchSummarize(articles: Message[]) -> Artifact | Fault:
+    node start:
+        summaries = map(articles, SummarizeItem) [concurrency=3]
+
+        route summaries:
+            Fault: fail
+            else: synthesize(summaries)
+
+    node synthesize(summaries):
+        report = llm(synthesize, summaries)
+        return Artifact(report=report)
+
+    node fail:
+        return Fault(reason="Batch processing failed")

@@ -1,0 +1,19 @@
+@air 0.2
+
+workflow PeerReview(content: Message, members: Participants) -> Artifact | Fault:
+
+    node start:
+        summary = llm(summarize, content)
+        history = transform(summary) as Message[] via func(to_history)
+        consensus, transcript = session(members, parley_v1, history)
+
+        route consensus:
+            PROCEED: publish(summary, transcript)
+            RETRY: start
+            else: reject(transcript)
+
+    node publish(summary, transcript):
+        return Artifact(status="approved", summary=summary, transcript=transcript)
+
+    node reject(transcript):
+        return Fault(reason="Rejected by peer review", transcript=transcript)

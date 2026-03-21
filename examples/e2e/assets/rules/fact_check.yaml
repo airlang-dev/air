@@ -1,0 +1,7 @@
+model: gemini/gemini-2.0-flash
+template: |
+  Verify whether the following claims are factually accurate.
+  Respond with PASS if all claims are correct, or FAIL if any claim is incorrect.
+  After your verdict, explain your reasoning.
+
+  Claims: {{input}}
