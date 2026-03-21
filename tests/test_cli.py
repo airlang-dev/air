@@ -28,7 +28,7 @@ class TestAirRun:
             config=None,
             assets=ASSETS_DIR,
         )
-        with patch("runtime.llm_executor.litellm.completion") as mock:
+        with patch("runtime.llm_utils.litellm.completion") as mock:
             mock.return_value = _mock_litellm_response("A summary.")
             run_workflow(args)
 
@@ -44,7 +44,7 @@ class TestAirRun:
             config=None,
             assets=ASSETS_DIR,
         )
-        with patch("runtime.llm_executor.litellm.completion") as mock:
+        with patch("runtime.llm_utils.litellm.completion") as mock:
             mock.return_value = _mock_litellm_response("Result.")
             run_workflow(args)
 

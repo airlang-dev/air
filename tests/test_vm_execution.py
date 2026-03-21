@@ -25,7 +25,7 @@ class TestLLMExecution:
         vm = AgentVM(asset_resolver=RESOLVER)
         vm.load(COMPILED_DIR / "SimpleLLM.airc")
 
-        with patch("runtime.llm_executor.litellm.completion") as mock_completion:
+        with patch("runtime.llm_utils.litellm.completion") as mock_completion:
             mock_completion.return_value = _mock_litellm_response("A concise summary.")
             result = vm.run(inputs={"content": "Some article text"})
 
@@ -47,7 +47,7 @@ class TestLLMExecution:
         vm = AgentVM(asset_resolver=RESOLVER)
         vm.load(graph)
 
-        with patch("runtime.llm_executor.litellm.completion") as mock_completion:
+        with patch("runtime.llm_utils.litellm.completion") as mock_completion:
             mock_completion.return_value = _mock_litellm_response("Claims extracted.")
             vm.run(inputs={"content": "Some text"})
 

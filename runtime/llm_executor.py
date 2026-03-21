@@ -3,7 +3,7 @@
 Resolves prompt assets and calls litellm for real LLM completions.
 """
 
-import litellm
+from runtime.llm_utils import call_llm
 
 
 class LLMExecutor:
@@ -21,8 +21,5 @@ class LLMExecutor:
         for val in input_vals:
             user_content += f"\n\n{val}"
 
-        response = litellm.completion(
-            model=model,
-            messages=[{"role": "user", "content": user_content}],
-        )
-        return response.choices[0].message.content
+        messages = [{"role": "user", "content": user_content}]
+        return call_llm(model=model, messages=messages, config=self._config)

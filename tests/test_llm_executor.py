@@ -24,7 +24,7 @@ class TestLLMExecutor:
         """Resolves prompt asset and calls litellm with template + inputs."""
         executor = LLMExecutor(RESOLVER, RuntimeConfig())
 
-        with patch("runtime.llm_executor.litellm.completion") as mock_completion:
+        with patch("runtime.llm_utils.litellm.completion") as mock_completion:
             mock_completion.return_value = _mock_litellm_response(
                 "Here are the claims..."
             )
@@ -40,7 +40,7 @@ class TestLLMExecutor:
         """The model specified in the prompt asset is passed to litellm."""
         executor = LLMExecutor(RESOLVER, RuntimeConfig())
 
-        with patch("runtime.llm_executor.litellm.completion") as mock_completion:
+        with patch("runtime.llm_utils.litellm.completion") as mock_completion:
             mock_completion.return_value = _mock_litellm_response("result")
             executor.execute("extract_claims", ["text"])
 
@@ -51,7 +51,7 @@ class TestLLMExecutor:
         """Uses config default_model when prompt asset has no model."""
         executor = LLMExecutor(RESOLVER, RuntimeConfig(default_model="gpt-4o"))
 
-        with patch("runtime.llm_executor.litellm.completion") as mock_completion:
+        with patch("runtime.llm_utils.litellm.completion") as mock_completion:
             mock_completion.return_value = _mock_litellm_response("summary")
             executor.execute("summarize", ["Some content"])
 
@@ -62,7 +62,7 @@ class TestLLMExecutor:
         """Multiple input values are appended to the prompt template."""
         executor = LLMExecutor(RESOLVER, RuntimeConfig())
 
-        with patch("runtime.llm_executor.litellm.completion") as mock_completion:
+        with patch("runtime.llm_utils.litellm.completion") as mock_completion:
             mock_completion.return_value = _mock_litellm_response("result")
             executor.execute("extract_claims", ["input one", "input two"])
 
@@ -76,7 +76,7 @@ class TestLLMExecutor:
         """Returns the string content from the LLM response."""
         executor = LLMExecutor(RESOLVER, RuntimeConfig())
 
-        with patch("runtime.llm_executor.litellm.completion") as mock_completion:
+        with patch("runtime.llm_utils.litellm.completion") as mock_completion:
             mock_completion.return_value = _mock_litellm_response(
                 '["claim1", "claim2"]'
             )
