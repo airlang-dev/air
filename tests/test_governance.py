@@ -60,10 +60,21 @@ class TestGateExecutor:
         assert self.executor.execute("UNCERTAIN") == "RETRY"
 
     def test_consensus_dict_pass(self):
-        assert self.executor.execute({"verdict": "PASS", "verdicts": ["PASS", "PASS"]}) == "PROCEED"
+        assert (
+            self.executor.execute({"verdict": "PASS", "verdicts": ["PASS", "PASS"]})
+            == "PROCEED"
+        )
 
     def test_consensus_dict_fail(self):
-        assert self.executor.execute({"verdict": "FAIL", "verdicts": ["FAIL", "PASS"]}) == "ESCALATE"
+        assert (
+            self.executor.execute({"verdict": "FAIL", "verdicts": ["FAIL", "PASS"]})
+            == "ESCALATE"
+        )
 
     def test_consensus_dict_uncertain(self):
-        assert self.executor.execute({"verdict": "UNCERTAIN", "verdicts": ["PASS", "UNCERTAIN"]}) == "RETRY"
+        assert (
+            self.executor.execute(
+                {"verdict": "UNCERTAIN", "verdicts": ["PASS", "UNCERTAIN"]}
+            )
+            == "RETRY"
+        )

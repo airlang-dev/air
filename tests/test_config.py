@@ -17,9 +17,7 @@ class TestRuntimeConfig:
 
     def test_load_from_file(self, tmp_path):
         config_path = tmp_path / "air.config.yaml"
-        config_path.write_text(
-            "default_model: gpt-4o\nassets_dir: my_assets\n"
-        )
+        config_path.write_text("default_model: gpt-4o\nassets_dir: my_assets\n")
         config = RuntimeConfig.from_file(config_path)
         assert config.default_model == "gpt-4o"
         assert config.assets_dir == "my_assets"

@@ -24,9 +24,7 @@ class TestLLMTransform:
         """LLM transform resolves prompt and calls litellm."""
         executor = TransformExecutor(RESOLVER, RuntimeConfig())
 
-        with patch(
-            "runtime.transform_executor.litellm.completion"
-        ) as mock_completion:
+        with patch("runtime.transform_executor.litellm.completion") as mock_completion:
             mock_completion.return_value = _mock_litellm_response(
                 '["claim1", "claim2"]'
             )
@@ -44,9 +42,7 @@ class TestLLMTransform:
         """The model specified in the prompt asset is used."""
         executor = TransformExecutor(RESOLVER, RuntimeConfig())
 
-        with patch(
-            "runtime.transform_executor.litellm.completion"
-        ) as mock_completion:
+        with patch("runtime.transform_executor.litellm.completion") as mock_completion:
             mock_completion.return_value = _mock_litellm_response("claims")
             executor.execute(
                 "text", {"target_type": "Claim[]", "via": "extract_claims"}

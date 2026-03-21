@@ -19,7 +19,10 @@ class TestEnumEdge:
 
     def test_matching_enum(self):
         edges = [
-            {"target": "approve_node", "condition": {"kind": "enum", "value": "approve"}},
+            {
+                "target": "approve_node",
+                "condition": {"kind": "enum", "value": "approve"},
+            },
             {"target": "reject_node", "condition": {"kind": "enum", "value": "reject"}},
         ]
         target, matched = EdgeResolver.resolve("approve", edges)
@@ -29,7 +32,10 @@ class TestEnumEdge:
 
     def test_non_matching_enum_falls_through(self):
         edges = [
-            {"target": "approve_node", "condition": {"kind": "enum", "value": "approve"}},
+            {
+                "target": "approve_node",
+                "condition": {"kind": "enum", "value": "approve"},
+            },
             {"target": "reject_node", "condition": {"kind": "enum", "value": "reject"}},
         ]
         target, matched = EdgeResolver.resolve("reject", edges)
@@ -65,8 +71,14 @@ class TestTypeEdge:
 
     def test_list_type_match(self):
         edges = [
-            {"target": "list_node", "condition": {"kind": "type", "name": "Claim", "is_list": True}},
-            {"target": "single_node", "condition": {"kind": "type", "name": "Claim", "is_list": False}},
+            {
+                "target": "list_node",
+                "condition": {"kind": "type", "name": "Claim", "is_list": True},
+            },
+            {
+                "target": "single_node",
+                "condition": {"kind": "type", "name": "Claim", "is_list": False},
+            },
         ]
         target, matched = EdgeResolver.resolve(["a", "b"], edges)
 
@@ -75,8 +87,14 @@ class TestTypeEdge:
 
     def test_non_list_type_match(self):
         edges = [
-            {"target": "list_node", "condition": {"kind": "type", "name": "Claim", "is_list": True}},
-            {"target": "single_node", "condition": {"kind": "type", "name": "Claim", "is_list": False}},
+            {
+                "target": "list_node",
+                "condition": {"kind": "type", "name": "Claim", "is_list": True},
+            },
+            {
+                "target": "single_node",
+                "condition": {"kind": "type", "name": "Claim", "is_list": False},
+            },
         ]
         target, matched = EdgeResolver.resolve("single value", edges)
 
@@ -88,7 +106,10 @@ class TestElseFallback:
 
     def test_else_when_no_enum_matches(self):
         edges = [
-            {"target": "approve_node", "condition": {"kind": "enum", "value": "approve"}},
+            {
+                "target": "approve_node",
+                "condition": {"kind": "enum", "value": "approve"},
+            },
             {"target": "fallback_node", "condition": {"kind": "else"}},
         ]
         target, matched = EdgeResolver.resolve("unknown", edges)
@@ -98,7 +119,10 @@ class TestElseFallback:
 
     def test_no_match_raises_error(self):
         edges = [
-            {"target": "approve_node", "condition": {"kind": "enum", "value": "approve"}},
+            {
+                "target": "approve_node",
+                "condition": {"kind": "enum", "value": "approve"},
+            },
         ]
         with pytest.raises(RuntimeError, match="no matching edge"):
             EdgeResolver.resolve("unknown", edges)

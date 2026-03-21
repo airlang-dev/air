@@ -24,9 +24,7 @@ class TestVerifyLLM:
         """Verify resolves rule asset and calls litellm."""
         executor = VerifyExecutor(RESOLVER, RuntimeConfig())
 
-        with patch(
-            "runtime.verify_executor.litellm.completion"
-        ) as mock_completion:
+        with patch("runtime.verify_executor.litellm.completion") as mock_completion:
             mock_completion.return_value = _mock_litellm_response(
                 "PASS\n\nAll products referenced are real."
             )
@@ -42,13 +40,13 @@ class TestVerifyLLM:
         """Extracts FAIL from LLM response."""
         executor = VerifyExecutor(RESOLVER, RuntimeConfig())
 
-        with patch(
-            "runtime.verify_executor.litellm.completion"
-        ) as mock_completion:
+        with patch("runtime.verify_executor.litellm.completion") as mock_completion:
             mock_completion.return_value = _mock_litellm_response(
                 "FAIL\n\nThe product 'XYZ-9000' does not exist."
             )
-            verdict, evidence = executor.execute("claims about XYZ-9000", "product_existence")
+            verdict, evidence = executor.execute(
+                "claims about XYZ-9000", "product_existence"
+            )
 
         assert verdict == "FAIL"
 
@@ -56,9 +54,7 @@ class TestVerifyLLM:
         """Extracts UNCERTAIN from LLM response."""
         executor = VerifyExecutor(RESOLVER, RuntimeConfig())
 
-        with patch(
-            "runtime.verify_executor.litellm.completion"
-        ) as mock_completion:
+        with patch("runtime.verify_executor.litellm.completion") as mock_completion:
             mock_completion.return_value = _mock_litellm_response(
                 "UNCERTAIN\n\nCannot confirm product availability."
             )
@@ -70,9 +66,7 @@ class TestVerifyLLM:
         """Extracts verdict even when embedded in longer text."""
         executor = VerifyExecutor(RESOLVER, RuntimeConfig())
 
-        with patch(
-            "runtime.verify_executor.litellm.completion"
-        ) as mock_completion:
+        with patch("runtime.verify_executor.litellm.completion") as mock_completion:
             mock_completion.return_value = _mock_litellm_response(
                 "After careful review, the verdict is PASS. All claims check out."
             )
@@ -84,9 +78,7 @@ class TestVerifyLLM:
         """Returns UNCERTAIN when verdict cannot be parsed."""
         executor = VerifyExecutor(RESOLVER, RuntimeConfig())
 
-        with patch(
-            "runtime.verify_executor.litellm.completion"
-        ) as mock_completion:
+        with patch("runtime.verify_executor.litellm.completion") as mock_completion:
             mock_completion.return_value = _mock_litellm_response(
                 "I'm not sure what to make of this."
             )
@@ -98,9 +90,7 @@ class TestVerifyLLM:
         """The model from the rule asset is passed to litellm."""
         executor = VerifyExecutor(RESOLVER, RuntimeConfig())
 
-        with patch(
-            "runtime.verify_executor.litellm.completion"
-        ) as mock_completion:
+        with patch("runtime.verify_executor.litellm.completion") as mock_completion:
             mock_completion.return_value = _mock_litellm_response("PASS")
             executor.execute("claims", "product_existence")
 

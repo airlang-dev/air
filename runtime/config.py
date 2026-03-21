@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 
 import yaml
 
-
 DEFAULT_MODEL = "claude-sonnet-4-20250514"
 CONFIG_FILENAME = "air.config.yaml"
 

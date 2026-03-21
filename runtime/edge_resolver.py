@@ -21,9 +21,7 @@ class EdgeResolver:
                 return edge["target"], cond["value"]
 
             if kind == "bool":
-                bool_val = (
-                    bool(value) if cond["value"] == "true" else not bool(value)
-                )
+                bool_val = bool(value) if cond["value"] == "true" else not bool(value)
                 if bool_val:
                     return edge["target"], cond["value"]
 
