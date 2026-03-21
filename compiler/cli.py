@@ -2,7 +2,10 @@ import argparse
 import os
 import sys
 
+from dotenv import load_dotenv
 from lark import UnexpectedInput
+
+load_dotenv()
 
 
 def main():
