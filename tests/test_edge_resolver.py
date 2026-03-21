@@ -96,7 +96,7 @@ class TestTypeEdge:
                 "condition": {"kind": "type", "name": "Claim", "is_list": False},
             },
         ]
-        target, matched = EdgeResolver.resolve("single value", edges)
+        target, matched = EdgeResolver.resolve({"type": "Claim", "value": "single"}, edges)
 
         assert target == "single_node"
         assert matched == "Claim"

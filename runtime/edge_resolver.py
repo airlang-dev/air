@@ -26,11 +26,12 @@ class EdgeResolver:
                     return edge["target"], cond["value"]
 
             if kind == "type":
+                type_name = cond.get("name")
                 is_list = cond.get("is_list", False)
                 if is_list and isinstance(value, list):
-                    return edge["target"], f"{cond['name']}[]"
-                elif not is_list and not isinstance(value, list):
-                    return edge["target"], cond.get("name", "type")
+                    return edge["target"], f"{type_name}[]"
+                elif not is_list and isinstance(value, dict) and value.get("type") == type_name:
+                    return edge["target"], type_name
 
         # "else" fallback
         for edge in edges:
