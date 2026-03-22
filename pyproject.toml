@@ -8,6 +8,7 @@ dependencies = [
     "jsonschema",
     "litellm",
     "pyyaml",
+    "hypothesis>=6.151.9",
 ]
 
 [project.scripts]

@@ -113,6 +113,7 @@ def compile_air(input_file, output_path):
 
 BACKENDS = {
     "langgraph": "backends.langgraph.backend:LangGraphBackend",
+    "bedrock": "backends.bedrock.backend:BedrockBackend",
 }
 
 

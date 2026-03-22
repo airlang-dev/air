@@ -1,3 +1,4 @@
+.kiro/
 .venv/
 .vscode/
 __pycache__/
@@ -6,3 +7,5 @@ dist/
 build/
 *.pyc
 .DS_Store
+.env
+.hypothesis/
