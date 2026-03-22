@@ -26,6 +26,10 @@ def main():
     backend_p.add_argument("backend_name", help="Backend name (e.g. langgraph)")
     backend_p.add_argument("air_graph_file", help="Path to AIR Graph (.airc) file")
     backend_p.add_argument("--output", "-o", help="Output path")
+    backend_p.add_argument("--assets", help="Path to assets directory (resolves prompts/rules inline)")
+    backend_p.add_argument("--model", help="Default model ID (bedrock backend)")
+    backend_p.add_argument("--region", help="AWS region (bedrock backend)")
+    backend_p.add_argument("--account-id", help="AWS account ID (bedrock backend)")
 
     run_p = sub.add_parser("run", help="Execute a compiled AIR Graph (.airc)")
     run_p.add_argument("airc_file", help="Path to compiled .airc file")
@@ -51,7 +55,7 @@ def main():
     if args.command == "compile":
         compile_air(args.file, args.output)
     elif args.command == "backend":
-        run_backend(args.backend_name, args.air_graph_file, args.output)
+        run_backend(args.backend_name, args.air_graph_file, args.output, args)
     elif args.command == "run":
         run_workflow(args)
     else:
@@ -117,7 +121,7 @@ BACKENDS = {
 }
 
 
-def run_backend(backend_name, air_graph_file, output_path):
+def run_backend(backend_name, air_graph_file, output_path, args=None):
     import json
 
     if backend_name not in BACKENDS:
@@ -134,11 +138,32 @@ def run_backend(backend_name, air_graph_file, output_path):
 
     mod = import_module(module_path)
     backend_cls = getattr(mod, class_name)
-    backend = backend_cls()
+
+    if backend_name == "bedrock" and args is not None:
+        from backends.bedrock.compiler import CompilationError
+        backend = backend_cls(
+            default_model_id=getattr(args, "model", None) or "amazon.nova-lite-v1:0",
+            region=getattr(args, "region", None) or "us-east-1",
+            account_id=getattr(args, "account_id", None) or "123456789012",
+            assets_dir=getattr(args, "assets", None),
+        )
+    else:
+        backend = backend_cls()
     print(f"[ok] Backend: {backend_name}")
 
-    code = backend.compile(air_graph, output_path)
-    out = output_path or f"build/{air_graph['workflow']}_langgraph.py"
+    if backend_name == "bedrock":
+        from backends.bedrock.compiler import CompilationError
+        out = output_path or f"build/{air_graph.get('workflow', 'workflow')}_bedrock.json"
+        try:
+            flow_def, warnings = backend.compile_with_warnings(air_graph, out)
+        except CompilationError as e:
+            print(f"[error] Compilation failed: {e}", file=sys.stderr)
+            sys.exit(1)
+        for w in warnings:
+            print(f"[warning] {w}", file=sys.stderr)
+    else:
+        out = backend.compile(air_graph, output_path)
+
     print(f"[ok] Generated: {out}")
 
 

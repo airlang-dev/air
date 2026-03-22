@@ -46,14 +46,11 @@ class TestBackendInterface:
     def test_inherits_from_backend(self):
         assert issubclass(BedrockBackend, Backend)
 
-    def test_compile_returns_dict_with_nodes_and_connections(self):
+    def test_compile_returns_output_path(self):
         b = _backend()
         result = b.compile(_simple_llm(), output_path=None)
-        assert isinstance(result, dict)
-        assert "nodes" in result
-        assert "connections" in result
-        assert isinstance(result["nodes"], list)
-        assert isinstance(result["connections"], list)
+        assert isinstance(result, str)
+        assert result.endswith("_bedrock.json")
 
     def test_default_output_path(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -168,7 +165,7 @@ class TestMapAndLoop:
             },
         }
         b = _backend()
-        result = b.compile(graph, output_path=None)
+        result, _ = b.compile_with_warnings(graph, output_path=None)
         node_types = [n["type"] for n in result["nodes"]]
         assert "Iterator" in node_types
         assert "Collector" in node_types

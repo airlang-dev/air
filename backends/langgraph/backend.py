@@ -80,7 +80,7 @@ class LangGraphBackend(Backend):
         with open(output_path, "w") as f:
             f.write(code)
 
-        return code
+        return output_path
 
     def _emit_imports(self, w: _CodeWriter, nodes: dict):
         w.line("from langgraph.graph import StateGraph, END")

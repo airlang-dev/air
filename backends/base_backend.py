@@ -5,5 +5,6 @@ class Backend:
     execution results. All backends must implement the compile method.
     """
 
-    def compile(self, air_graph: dict):
+    def compile(self, air_graph: dict, output_path: str = None) -> str:
+        """Compile air_graph and write to output_path. Returns the path written."""
         raise NotImplementedError

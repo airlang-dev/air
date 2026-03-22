@@ -217,15 +217,15 @@ class BedrockBackend(Backend):
         self,
         air_graph: dict,
         output_path: str | None = None,
-    ) -> dict:
-        """Compile AIR Graph to Bedrock Flow definition dict.
+    ) -> str:
+        """Compile AIR Graph to Bedrock Flow definition and write to disk.
 
-        Implements the Backend interface. Warnings are discarded (use
-        compile_with_warnings() for programmatic access to warnings).
+        Implements the Backend interface. Returns the path written.
+        Warnings are discarded (use compile_with_warnings() for programmatic access).
         """
         workflow = air_graph.get("workflow", "workflow")
         if output_path is None:
             output_path = f"build/{workflow}_bedrock.json"
 
-        flow_def, _ = self.compile_with_warnings(air_graph, output_path)
-        return flow_def
+        self.compile_with_warnings(air_graph, output_path)
+        return output_path
