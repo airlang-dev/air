@@ -1,0 +1,25 @@
+@air 0.2
+
+workflow W(content: Message) -> Artifact | Fault:
+    node analyze [max=3]:
+        summary = llm(summarize, content)
+        claims = transform(summary) as Claim[] via llm(extract_claims)
+
+        route claims:
+            Fault: analyze
+            else: validate(claims)
+
+    node validate(claims):
+        verdict = verify(claims, accuracy)
+        outcome = gate(verdict)
+
+        route outcome:
+            PROCEED: done
+            RETRY: analyze
+            HALT: abort
+
+    node done:
+        return Artifact(status="ok")
+
+    node abort:
+        return Fault(reason="failed")

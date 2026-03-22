@@ -14,6 +14,7 @@ class CFGNode:
     instructions: list = field(default_factory=list)
     edges: list[CFGEdge] = field(default_factory=list)
     terminal: bool = False
+    max_visits: Optional[int] = None
 
 
 @dataclass

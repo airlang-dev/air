@@ -237,6 +237,43 @@ class TestEdges:
 
 
 # ---------------------------------------------------------------------------
+# Max visits (bounded loops)
+# ---------------------------------------------------------------------------
+
+
+class TestMaxVisits:
+
+    def test_max_visits_propagated_to_graph(self, parser):
+        """Node with [max=N] should have max_visits set on AirGraphNode."""
+        graph = build_graph(parser, "max_visits")
+        analyze = next(n for n in graph.nodes if n.name == "analyze")
+        assert analyze.max_visits == 3
+
+    def test_max_visits_none_by_default(self, parser):
+        """Nodes without [max=N] should have max_visits=None."""
+        graph = build_graph(parser, "max_visits")
+        validate = next(n for n in graph.nodes if n.name == "validate")
+        done = next(n for n in graph.nodes if n.name == "done")
+        assert validate.max_visits is None
+        assert done.max_visits is None
+
+    def test_max_visits_with_back_edge(self, parser):
+        """Node with max_visits should preserve its back-edge."""
+        graph = build_graph(parser, "max_visits")
+        analyze = next(n for n in graph.nodes if n.name == "analyze")
+        targets = {e.target for e in analyze.edges}
+        assert "analyze" in targets
+
+    def test_max_visits_coexists_with_operations(self, parser):
+        """max_visits should not interfere with operation compilation."""
+        graph = build_graph(parser, "max_visits")
+        analyze = next(n for n in graph.nodes if n.name == "analyze")
+        op_types = [op.type for op in analyze.operations]
+        assert "llm" in op_types
+        assert "transform" in op_types
+
+
+# ---------------------------------------------------------------------------
 # Serialization
 # ---------------------------------------------------------------------------
 
@@ -281,6 +318,18 @@ class TestSerialization:
         kinds = {c["kind"] for c in conditions}
         assert "enum" in kinds
 
+    def test_serialized_max_visits_present(self, parser):
+        """Node with max_visits should have it in serialized output."""
+        data = build_and_serialize(parser, "max_visits")
+        assert data["nodes"]["analyze"]["max_visits"] == 3
+
+    def test_serialized_max_visits_omitted_when_none(self, parser):
+        """Nodes without max_visits should not have the key in serialized output."""
+        data = build_and_serialize(parser, "max_visits")
+        assert "max_visits" not in data["nodes"]["validate"]
+        assert "max_visits" not in data["nodes"]["done"]
+        assert "max_visits" not in data["nodes"]["abort"]
+
 
 # ---------------------------------------------------------------------------
 # Schema validation
@@ -304,8 +353,10 @@ class TestSchemaValidation:
             "return_fields",
             "list_assignment",
             "map",
+            "max_visits",
         ],
     )
     def test_fixture_validates(self, parser, fixture):
         data = build_and_serialize(parser, fixture)
         validate_air_graph(data)  # should not raise
+

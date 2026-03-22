@@ -51,6 +51,7 @@ def build_air_graph(cfg: CFG, workflow_name: str, params=None) -> AirGraphWorkfl
         node = AirGraphNode(
             name=label,
             terminal=cfg_node.terminal,
+            max_visits=cfg_node.max_visits,
         )
         _convert_instructions(cfg_node.instructions, node.operations)
         node.route_variable = _find_route_variable(cfg_node.instructions)

@@ -59,6 +59,8 @@ def serialize_node(node):
         "operations": [serialize_operation(op) for op in node.operations],
         "terminal": node.terminal,
     }
+    if node.max_visits is not None:
+        result["max_visits"] = node.max_visits
     if node.route_variable is not None:
         result["route_variable"] = node.route_variable
     if node.edges:

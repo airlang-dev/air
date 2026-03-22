@@ -208,3 +208,31 @@ class TestEdgeValidation:
                     assert (
                         edge.target in cfg.nodes
                     ), f"Edge from {label} to unknown {edge.target}"
+
+
+# ---------------------------------------------------------------------------
+# Max visits (bounded loops)
+# ---------------------------------------------------------------------------
+
+
+class TestMaxVisits:
+
+    def test_max_visits_propagated(self, parser):
+        """Node with [max=N] should have max_visits set on the CFGNode."""
+        cfg = build_cfg_from_fixture(parser, "max_visits")
+        assert cfg.nodes["analyze"].max_visits == 3
+
+    def test_max_visits_none_by_default(self, parser):
+        """Nodes without [max=N] should have max_visits=None."""
+        cfg = build_cfg_from_fixture(parser, "max_visits")
+        assert cfg.nodes["validate"].max_visits is None
+        assert cfg.nodes["done"].max_visits is None
+        assert cfg.nodes["abort"].max_visits is None
+
+    def test_max_visits_back_edge_present(self, parser):
+        """Node with max_visits should still have its back-edge to itself."""
+        cfg = build_cfg_from_fixture(parser, "max_visits")
+        analyze = cfg.nodes["analyze"]
+        targets = {e.target for e in analyze.edges}
+        assert "analyze" in targets  # self-referencing back-edge on Fault
+

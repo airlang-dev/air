@@ -39,6 +39,7 @@ class AirGraphNode:
     route_variable: Optional[str] = None
     edges: list[AirGraphEdge] = field(default_factory=list)
     terminal: bool = False
+    max_visits: Optional[int] = None
 
 
 @dataclass

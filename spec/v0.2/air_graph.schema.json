@@ -54,6 +54,11 @@
           "type": "array",
           "items": { "$ref": "#/$defs/Operation" }
         },
+        "max_visits": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of times this node may be visited (for bounded loops)"
+        },
         "route_variable": {
           "type": "string",
           "description": "Variable used for routing (may use dot notation)"

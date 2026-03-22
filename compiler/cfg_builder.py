@@ -89,6 +89,7 @@ def build_cfg(workflow: Workflow) -> CFG:
             instructions=list(node.body),
             terminal=_has_return(node.body),
             edges=_collect_edges(node.body),
+            max_visits=node.max_visits,
         )
         cfg.nodes[node.name] = cfg_node
 
